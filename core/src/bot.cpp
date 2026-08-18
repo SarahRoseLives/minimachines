@@ -37,9 +37,42 @@ static float castRay(float startX, float startY, float angle, float maxDist, con
 }
 
 PlayerInput botComputeInput(const CarState& car, const RacerState& racer,
-                           const MapData& map, const BotConfig& cfg) {
+                           const MapData& map, const BotConfig& cfg,
+                           BotState& state, float dt) {
     PlayerInput in;
     int ts = map.tileSize();
+
+    if (car.speed < 10.0f && std::abs(in.throttle) > 0.1f) {
+        state.stuckTimer += dt;
+    } else {
+        state.stuckTimer = std::max(0.0f, state.stuckTimer - dt * 2.0f);
+    }
+
+    if (state.reverseTimer > 0.0f) {
+        state.reverseTimer -= dt;
+        float angleToTarget = 0.0f;
+        auto& cps = map.checkpoints();
+        if (!cps.empty()) {
+            int next = racer.currentCheckpoint;
+            auto& cp = cps[next];
+            float targetX = (cp.x1 + cp.x2 + 1.0f) * 0.5f * ts;
+            float targetY = (cp.y1 + cp.y2 + 1.0f) * 0.5f * ts;
+            angleToTarget = std::atan2(targetY - car.y, targetX - car.x);
+        }
+        float angleDiff = normalizeAngle(angleToTarget - car.heading);
+        in.steer = (angleDiff > 0) ? -1.0f : 1.0f;
+        in.throttle = -0.8f;
+        in.handbrake = false;
+        return in;
+    }
+
+    if (state.stuckTimer > 0.8f) {
+        state.stuckTimer = 0.0f;
+        state.reverseTimer = 0.5f;
+        in.throttle = -0.8f;
+        in.steer = 0.0f;
+        return in;
+    }
 
     auto& cps = map.checkpoints();
     if (cps.empty()) {

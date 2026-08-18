@@ -45,6 +45,7 @@ private:
     void scanMaps();
     void loadMap(const std::string& path);
     void loadFallback();
+    void loadRandomMap();
     void resetAllCars();
     void spawnBots();
     void updateTrails(float dt);
@@ -55,6 +56,7 @@ private:
     void renderCars(SDL_Renderer* r);
     void renderCar(SDL_Renderer* r, int idx);
     void renderHUD(SDL_Renderer* renderer);
+    void renderMinimap(SDL_Renderer* renderer);
     void renderFinishScreen(SDL_Renderer* renderer);
     void generateFallbackMap();
 
@@ -69,6 +71,7 @@ private:
 
     std::vector<CarState> m_cars;
     std::vector<BotConfig> m_botConfigs;
+    std::vector<BotState> m_botStates;
     std::vector<CarVisual> m_carVisuals;
     int m_playerIndex = 0;
 

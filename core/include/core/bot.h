@@ -16,7 +16,13 @@ struct BotConfig {
     float rayDistance = 5.0f;
 };
 
+struct BotState {
+    float stuckTimer = 0.0f;
+    float reverseTimer = 0.0f;
+};
+
 PlayerInput botComputeInput(const CarState& car, const RacerState& racer,
-                           const MapData& map, const BotConfig& cfg);
+                           const MapData& map, const BotConfig& cfg,
+                           BotState& state, float dt);
 
 } // namespace mm

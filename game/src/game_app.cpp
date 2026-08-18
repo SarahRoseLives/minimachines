@@ -7,6 +7,8 @@
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
+#include <random>
+#include <algorithm>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -77,6 +79,191 @@ void GameApp::generateFallbackMap() {
 
     m_map.setLaps(3);
 }
+void GameApp::loadRandomMap() {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+
+    const int W = 1000, H = 1000, TS = 32;
+    const int ROAD_HW = 3;
+    const int PAD = 60;
+    const float PI = 3.14159265358979f;
+
+    m_map = MapData(W, H, TS);
+    m_map.name() = "Random Track";
+    for (int y = 0; y < H; ++y)
+        for (int x = 0; x < W; ++x)
+            m_map.setGround(x, y, TileType::Grass);
+
+    auto segDist = [](float ax, float ay, float bx, float by,
+                      float cx, float cy, float dx, float dy) -> float {
+        auto dot = [](float ax, float ay, float bx, float by) { return ax*bx + ay*by; };
+        float abx = bx-ax, aby = by-ay, len2 = abx*abx+aby*aby;
+        if (len2 < 0.001f) { float dxx=cx-ax,dyy=cy-ay; return std::sqrt(dxx*dxx+dyy*dyy); }
+        float t = std::clamp(dot(cx-ax,cy-ay,abx,aby)/len2, 0.0f, 1.0f);
+        float px = ax+t*abx, py = ay+t*aby;
+        float cdx = dx-cx, cdy = dy-cy, len2cd = cdx*cdx+cdy*cdy;
+        if (len2cd < 0.001f) { float dxx=px-cx,dyy=py-cy; return std::sqrt(dxx*dxx+dyy*dyy); }
+        float s = std::clamp(dot(px-cx,py-cy,cdx,cdy)/len2cd, 0.0f, 1.0f);
+        float qx = cx+s*cdx, qy = cy+s*cdy;
+        float dxx = px-qx, dyy = py-qy;
+        return std::sqrt(dxx*dxx+dyy*dyy);
+    };
+
+    auto overlaps = [&](int ax, int ay, int bx, int by,
+                        const std::vector<std::pair<int,int>>& wp, int skipEnds) -> bool {
+        int n = static_cast<int>(wp.size());
+        for (int j = 0; j < n - 1; ++j) {
+            if (j < skipEnds && j > 0) continue;
+            if (j >= n - 1 - skipEnds) continue;
+            auto& a = wp[j]; auto& b = wp[j+1];
+            if (segDist(ax,ay,bx,by, a.first,a.second,b.first,b.second) < ROAD_HW*2+6)
+                return true;
+        }
+        return false;
+    };
+
+    auto drawLine = [&](int x1, int y1, int x2, int y2) {
+        int dx = std::abs(x2-x1), dy = std::abs(y2-y1);
+        int sx = (x1<x2)?1:-1, sy = (y1<y2)?1:-1, err = dx-dy;
+        int cx = x1, cy = y1;
+        while (true) {
+            for (int oy=-ROAD_HW; oy<=ROAD_HW; ++oy)
+                for (int ox=-ROAD_HW; ox<=ROAD_HW; ++ox) {
+                    int px=cx+ox, py=cy+oy;
+                    if (px>=1 && px<W-1 && py>=1 && py<H-1)
+                        m_map.setGround(px, py, TileType::Road);
+                }
+            if (cx==x2 && cy==y2) break;
+            int e2 = 2*err;
+            if (e2 > -dy) { err -= dy; cx += sx; }
+            if (e2 < dx)  { err += dx; cy += sy; }
+        }
+    };
+
+    float centerX = W/2.0f, centerY = H/2.0f;
+
+    for (int attempt = 0; attempt < 100; ++attempt) {
+        std::vector<std::pair<int,int>> wp;
+
+        float sa = std::uniform_real_distribution<>(0.0f, 2.0f*PI)(gen);
+        float sd = std::uniform_real_distribution<>(150.0f, 250.0f)(gen);
+        wp.push_back({std::clamp((int)(centerX + sd*std::cos(sa)), PAD, W-PAD-1),
+                      std::clamp((int)(centerY + sd*std::sin(sa)), PAD, H-PAD-1)});
+
+        float angle = sa + PI + std::uniform_real_distribution<>(-0.5f, 0.5f)(gen);
+
+        for (int i = 0; i < 30; ++i) {
+            angle += std::uniform_real_distribution<>(-1.2f, 1.2f)(gen);
+            float step = std::uniform_real_distribution<>(30.0f, 70.0f)(gen);
+            int nx = std::clamp((int)(wp.back().first + step*std::cos(angle)), PAD, W-PAD-1);
+            int ny = std::clamp((int)(wp.back().second + step*std::sin(angle)), PAD, H-PAD-1);
+
+            if (overlaps(wp.back().first, wp.back().second, nx, ny, wp, 0)) {
+                angle += PI*0.5f;
+                continue;
+            }
+            wp.push_back({nx, ny});
+        }
+
+        if (wp.size() < 12) continue;
+
+        auto& last = wp.back();
+        auto& first = wp.front();
+        float gap = std::sqrt((float)((first.first-last.first)*(first.first-last.first) +
+                                      (first.second-last.second)*(first.second-last.second)));
+
+        int closureSteps = std::max(2, (int)(gap / 40.0f));
+        bool closureOk = true;
+        std::vector<std::pair<int,int>> closure;
+
+        for (int step = 1; step <= closureSteps; ++step) {
+            float t = (float)step / closureSteps;
+            int mx = (int)(last.first + (first.first - last.first) * t)
+                     + std::uniform_int_distribution<>(-3,3)(gen);
+            int my = (int)(last.second + (first.second - last.second) * t)
+                     + std::uniform_int_distribution<>(-3,3)(gen);
+            mx = std::clamp(mx, PAD, W-PAD-1);
+            my = std::clamp(my, PAD, H-PAD-1);
+
+            auto& prev = closure.empty() ? last : closure.back();
+            if (overlaps(prev.first, prev.second, mx, my, wp, 0) ||
+                overlaps(prev.first, prev.second, mx, my, closure, 0)) {
+                closureOk = false;
+                break;
+            }
+            closure.push_back({mx, my});
+        }
+
+        if (!closureOk) continue;
+
+        auto& closureLast = closure.back();
+        if (overlaps(closureLast.first, closureLast.second, first.first, first.second, wp, 0) ||
+            overlaps(closureLast.first, closureLast.second, first.first, first.second, closure, 0))
+            continue;
+
+        for (auto& c : closure) wp.push_back(c);
+
+        int numWP = (int)wp.size();
+        for (int i = 0; i < numWP; ++i)
+            drawLine(wp[i].first, wp[i].second, wp[(i+1)%numWP].first, wp[(i+1)%numWP].second);
+
+        for (int y = 0; y < H; ++y)
+            for (int x = 0; x < W; ++x)
+                if (x==0||x==W-1||y==0||y==H-1) m_map.setGround(x, y, TileType::Wall);
+
+        for (int y = 1; y < H-1; ++y)
+            for (int x = 1; x < W-1; ++x)
+                if (m_map.getGround(x,y) == TileType::Grass) {
+                    bool nr = false;
+                    for (int dy=-1; dy<=1 && !nr; ++dy)
+                        for (int dx=-1; dx<=1 && !nr; ++dx)
+                            if (m_map.getGround(x+dx,y+dy) == TileType::Road) nr = true;
+                    if (nr) m_map.setGround(x, y, TileType::Wall);
+                }
+
+        int cpStep = std::max(1, numWP / 4);
+        for (int i = 0; i < numWP; i += cpStep) {
+            auto& p = wp[i];
+            auto& pn = wp[(i+1)%numWP];
+            float dirX = (float)(pn.first-p.first), dirY = (float)(pn.second-p.second);
+            float dirLen = std::sqrt(dirX*dirX+dirY*dirY);
+            if (dirLen < 0.001f) continue;
+            float perpX = -dirY/dirLen, perpY = dirX/dirLen;
+            int hs = ROAD_HW + 2;
+            m_map.checkpoints().push_back({
+                p.first + (int)(perpX*hs), p.second + (int)(perpY*hs),
+                p.first - (int)(perpX*hs), p.second - (int)(perpY*hs)
+            });
+        }
+
+        float spawnAng = std::atan2((float)(wp[1].second-wp[0].second), (float)(wp[1].first-wp[0].first));
+        Spawn sp; sp.x = wp[0].first; sp.y = wp[0].second; sp.angle = spawnAng;
+        m_map.spawns().push_back(sp);
+        m_map.setLaps(3);
+        break;
+    }
+
+    m_cars.clear();
+    m_botConfigs.clear();
+    m_botStates.clear();
+    m_carVisuals.clear();
+    m_playerIndex = 0;
+
+    CarState playerCar;
+    m_cars.push_back(playerCar);
+    CarVisual playerVis;
+    playerVis.r = CAR_COLORS[0][0];
+    playerVis.g = CAR_COLORS[0][1];
+    playerVis.b = CAR_COLORS[0][2];
+    m_carVisuals.push_back(playerVis);
+
+    spawnBots();
+    resetAllCars();
+    raceInit(m_race, m_map, static_cast<int>(m_cars.size()));
+    m_camera.x = m_cars[0].x;
+    m_camera.y = m_cars[0].y;
+    m_state = AppState::Playing;
+}
 
 void GameApp::spawnBots() {
     int ts = m_map.tileSize();
@@ -110,6 +297,7 @@ void GameApp::spawnBots() {
         cfg.aggression = 0.6f + (i * 0.1f);
         cfg.accuracy = 0.7f + (i * 0.05f);
         m_botConfigs.push_back(cfg);
+        m_botStates.push_back(BotState{});
 
         CarVisual vis;
         vis.r = CAR_COLORS[i + 1][0];
@@ -167,6 +355,7 @@ void GameApp::loadMap(const std::string& path) {
 
     m_cars.clear();
     m_botConfigs.clear();
+    m_botStates.clear();
     m_carVisuals.clear();
     m_playerIndex = 0;
 
@@ -191,6 +380,7 @@ void GameApp::loadFallback() {
 
     m_cars.clear();
     m_botConfigs.clear();
+    m_botStates.clear();
     m_carVisuals.clear();
     m_playerIndex = 0;
 
@@ -317,7 +507,7 @@ void GameApp::update(float dt) {
             if (i == m_playerIndex) {
                 carUpdate(m_cars[i], playerIn, m_carCfg, m_map, dt);
             } else {
-                PlayerInput botIn = botComputeInput(m_cars[i], m_race.racers[i], m_map, m_botConfigs[i - 1]);
+                PlayerInput botIn = botComputeInput(m_cars[i], m_race.racers[i], m_map, m_botConfigs[i - 1], m_botStates[i - 1], dt);
                 carUpdate(m_cars[i], botIn, m_carCfg, m_map, dt);
             }
         } else if (m_race.state == RaceState::Countdown) {
@@ -357,6 +547,7 @@ void GameApp::render(SDL_Renderer* renderer) {
         renderTrails(renderer);
         renderCars(renderer);
         renderHUD(renderer);
+        renderMinimap(renderer);
 
         if (m_race.state == RaceState::Finished) {
             renderFinishScreen(renderer);
@@ -412,6 +603,9 @@ void GameApp::renderMenu(SDL_Renderer* renderer) {
     ImGui::Separator();
     if (ImGui::Button("Fallback Track", ImVec2(380, 40)))
         loadFallback();
+
+    if (ImGui::Button("Random Track", ImVec2(380, 40)))
+        loadRandomMap();
 
     ImGui::Separator();
     if (ImGui::Button("Quit", ImVec2(380, 30)))
@@ -632,6 +826,62 @@ void GameApp::renderHUD(SDL_Renderer* renderer) {
         ImGui::End();
         ImGui::PopStyleVar();
     }
+}
+
+void GameApp::renderMinimap(SDL_Renderer* r) {
+    int sw, sh;
+    SDL_GetRendererOutputSize(r, &sw, &sh);
+
+    int mapW = m_map.width();
+    int mapH = m_map.height();
+    int minimapSize = 180;
+    float scale = (float)minimapSize / std::max(mapW, mapH);
+    int drawW = (int)(mapW * scale);
+    int drawH = (int)(mapH * scale);
+    int ox = sw - drawW - 10;
+    int oy = sh - drawH - 10;
+
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(r, 0, 0, 0, 160);
+    SDL_Rect bg = {ox - 2, oy - 2, drawW + 4, drawH + 4};
+    SDL_RenderFillRect(r, &bg);
+
+    int step = std::max(1, mapW / drawW);
+    for (int ty = 0; ty < mapH; ty += step) {
+        for (int tx = 0; tx < mapW; tx += step) {
+            TileType ground = m_map.getGround(tx, ty);
+            TileType obj = m_map.getObject(tx, ty);
+            TileType display = (obj != TileType::Empty) ? obj : ground;
+            const TileInfo* info = findTileInfo(display);
+            if (!info) continue;
+
+            SDL_SetRenderDrawColor(r, info->r, info->g, info->b, 200);
+            int px = ox + (int)(tx * scale);
+            int py = oy + (int)(ty * scale);
+            int ps = std::max(1, (int)(step * scale));
+            SDL_Rect dst = {px, py, ps, ps};
+            SDL_RenderFillRect(r, &dst);
+        }
+    }
+
+    for (int i = 0; i < static_cast<int>(m_cars.size()); ++i) {
+        auto& car = m_cars[i];
+        auto& vis = m_carVisuals[i];
+        int cx = ox + (int)(car.x / m_map.tileSize() * scale);
+        int cy = oy + (int)(car.y / m_map.tileSize() * scale);
+        int dotSize = (i == m_playerIndex) ? 4 : 3;
+
+        SDL_SetRenderDrawColor(r, vis.r, vis.g, vis.b, 255);
+        SDL_Rect dot = {cx - dotSize/2, cy - dotSize/2, dotSize, dotSize};
+        SDL_RenderFillRect(r, &dot);
+
+        if (i == m_playerIndex) {
+            SDL_SetRenderDrawColor(r, 255, 255, 255, 255);
+            SDL_RenderDrawRect(r, &dot);
+        }
+    }
+
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
 }
 
 void GameApp::renderFinishScreen(SDL_Renderer* renderer) {
