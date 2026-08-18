@@ -1,0 +1,334 @@
+{
+	"archive" : {},
+	"artifacts" : 
+	[
+		{
+			"path" : "_deps/enet_src-build/libenet.a"
+		}
+	],
+	"backtrace" : 1,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_library",
+			"install",
+			"add_definitions",
+			"include_directories"
+		],
+		"files" : 
+		[
+			".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 87,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 96,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 28,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 37,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 40,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 34,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 49,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 46,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 52,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 31,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 55,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 58,
+				"parent" : 0
+			}
+		]
+	},
+	"compileGroups" : 
+	[
+		{
+			"compileCommandFragments" : 
+			[
+				{
+					"fragment" : "-g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC   -Wno-error"
+				}
+			],
+			"defines" : 
+			[
+				{
+					"backtrace" : 3,
+					"define" : "HAS_FCNTL=1"
+				},
+				{
+					"backtrace" : 4,
+					"define" : "HAS_GETADDRINFO=1"
+				},
+				{
+					"backtrace" : 5,
+					"define" : "HAS_GETHOSTBYNAME_R=1"
+				},
+				{
+					"backtrace" : 6,
+					"define" : "HAS_GETNAMEINFO=1"
+				},
+				{
+					"backtrace" : 7,
+					"define" : "HAS_INET_NTOP=1"
+				},
+				{
+					"backtrace" : 8,
+					"define" : "HAS_INET_PTON=1"
+				},
+				{
+					"backtrace" : 9,
+					"define" : "HAS_MSGHDR_FLAGS=1"
+				},
+				{
+					"backtrace" : 10,
+					"define" : "HAS_POLL=1"
+				},
+				{
+					"backtrace" : 11,
+					"define" : "HAS_SOCKLEN_T=1"
+				}
+			],
+			"includes" : 
+			[
+				{
+					"backtrace" : 12,
+					"path" : "C:/Users/SarahRose/PycharmProjects/minimachines/android/app/.cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/include"
+				}
+			],
+			"language" : "C",
+			"sourceIndexes" : 
+			[
+				9,
+				10,
+				11,
+				12,
+				13,
+				14,
+				15,
+				16,
+				17
+			],
+			"sysroot" : 
+			{
+				"path" : "C:/Users/SarahRose/AppData/Local/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot"
+			}
+		}
+	],
+	"id" : "enet::@5b730baaf47f8a9695ea",
+	"install" : 
+	{
+		"destinations" : 
+		[
+			{
+				"backtrace" : 2,
+				"path" : "lib/static"
+			}
+		],
+		"prefix" : 
+		{
+			"path" : "C:/Program Files (x86)/minimachines"
+		}
+	},
+	"name" : "enet",
+	"nameOnDisk" : "libenet.a",
+	"paths" : 
+	{
+		"build" : "_deps/enet_src-build",
+		"source" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src"
+	},
+	"sourceGroups" : 
+	[
+		{
+			"name" : "include",
+			"sourceIndexes" : 
+			[
+				0,
+				1,
+				2,
+				3,
+				4,
+				5,
+				6,
+				7,
+				8
+			]
+		},
+		{
+			"name" : "source",
+			"sourceIndexes" : 
+			[
+				9,
+				10,
+				11,
+				12,
+				13,
+				14,
+				15,
+				16,
+				17
+			]
+		}
+	],
+	"sources" : 
+	[
+		{
+			"backtrace" : 1,
+			"path" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/include/enet/callbacks.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"path" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/include/enet/enet.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"path" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/include/enet/list.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"path" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/include/enet/protocol.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"path" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/include/enet/time.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"path" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/include/enet/types.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"path" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/include/enet/unix.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"path" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/include/enet/utility.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"path" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/include/enet/win32.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/callbacks.c",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/compress.c",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/host.c",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/list.c",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/packet.c",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/peer.c",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/protocol.c",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/unix.c",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-src/win32.c",
+			"sourceGroupIndex" : 1
+		}
+	],
+	"type" : "STATIC_LIBRARY"
+}

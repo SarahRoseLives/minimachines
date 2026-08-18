@@ -1,0 +1,6 @@
+C:\Users\SarahRose\PycharmProjects\minimachines\android\app\.cxx\Debug\f2a19163\arm64-v8a\_deps\enet_src-src\CMakeLists.txt
+C:\Users\SarahRose\PycharmProjects\minimachines\android\app\.cxx\Debug\f2a19163\arm64-v8a\_deps\httplib-src\CMakeLists.txt
+C:\Users\SarahRose\PycharmProjects\minimachines\android\app\.cxx\Debug\f2a19163\arm64-v8a\_deps\json-src\CMakeLists.txt
+C:\Users\SarahRose\PycharmProjects\minimachines\android\app\.cxx\Debug\f2a19163\arm64-v8a\_deps\sdl2-src\CMakeLists.txt
+C:\Users\SarahRose\PycharmProjects\minimachines\android\app\.cxx\Debug\f2a19163\arm64-v8a\_deps\sdl2_image-src\CMakeLists.txt
+C:\Users\SarahRose\PycharmProjects\minimachines\android\app\CMakeLists.txt

@@ -1,0 +1,20 @@
+                        -HC:\Users\SarahRose\PycharmProjects\minimachines\android\app
+-DCMAKE_SYSTEM_NAME=Android
+-DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+-DCMAKE_SYSTEM_VERSION=21
+-DANDROID_ABI=arm64-v8a
+-DCMAKE_ANDROID_ARCH_ABI=arm64-v8a
+-DANDROID_NDK=C:\Users\SarahRose\AppData\Local\Android\Sdk\ndk\27.0.12077973
+-DCMAKE_ANDROID_NDK=C:\Users\SarahRose\AppData\Local\Android\Sdk\ndk\27.0.12077973
+-DCMAKE_TOOLCHAIN_FILE=C:\Users\SarahRose\AppData\Local\Android\Sdk\ndk\27.0.12077973\build\cmake\android.toolchain.cmake
+-DCMAKE_MAKE_PROGRAM=C:\Users\SarahRose\AppData\Local\Android\Sdk\cmake\3.22.1\bin\ninja.exe
+-DCMAKE_CXX_FLAGS=-std=c++20
+-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=C:\Users\SarahRose\PycharmProjects\minimachines\android\app\build\intermediates\cxx\Debug\f2a19163\obj\arm64-v8a
+-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=C:\Users\SarahRose\PycharmProjects\minimachines\android\app\build\intermediates\cxx\Debug\f2a19163\obj\arm64-v8a
+-DCMAKE_BUILD_TYPE=Debug
+-BC:\Users\SarahRose\PycharmProjects\minimachines\android\app\.cxx\Debug\f2a19163\arm64-v8a
+-GNinja
+-DANDROID_STL=c++_shared
+-DANDROID_PLATFORM=android-21
+                        Build command args: []
+                        Version: 2

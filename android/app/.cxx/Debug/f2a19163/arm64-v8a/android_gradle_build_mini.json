@@ -1,0 +1,101 @@
+{
+  "buildFiles": [
+    "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\.cxx\\Debug\\f2a19163\\arm64-v8a\\_deps\\enet_src-src\\CMakeLists.txt",
+    "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\.cxx\\Debug\\f2a19163\\arm64-v8a\\_deps\\httplib-src\\CMakeLists.txt",
+    "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\.cxx\\Debug\\f2a19163\\arm64-v8a\\_deps\\json-src\\CMakeLists.txt",
+    "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\.cxx\\Debug\\f2a19163\\arm64-v8a\\_deps\\sdl2-src\\CMakeLists.txt",
+    "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\.cxx\\Debug\\f2a19163\\arm64-v8a\\_deps\\sdl2_image-src\\CMakeLists.txt",
+    "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "C:\\Users\\SarahRose\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+      "-C",
+      "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\.cxx\\Debug\\f2a19163\\arm64-v8a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "C:\\Users\\SarahRose\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+    "-C",
+    "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\.cxx\\Debug\\f2a19163\\arm64-v8a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "sdl_headers_copy::@45bd952f1071c035638d": {
+      "artifactName": "sdl_headers_copy",
+      "abi": "arm64-v8a",
+      "runtimeFiles": []
+    },
+    "imgui::@6890427a1f51a3e7e1df": {
+      "artifactName": "imgui",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\.cxx\\Debug\\f2a19163\\arm64-v8a\\libimgui.a",
+      "runtimeFiles": []
+    },
+    "main::@6890427a1f51a3e7e1df": {
+      "artifactName": "main",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\build\\intermediates\\cxx\\Debug\\f2a19163\\obj\\arm64-v8a\\libmain.so",
+      "runtimeFiles": [
+        "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\build\\intermediates\\cxx\\Debug\\f2a19163\\obj\\arm64-v8a\\libSDL2_image.so",
+        "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\build\\intermediates\\cxx\\Debug\\f2a19163\\obj\\arm64-v8a\\libSDL2.so"
+      ]
+    },
+    "SDL2_image::@de341d98faad78faee90": {
+      "artifactName": "SDL2_image",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\build\\intermediates\\cxx\\Debug\\f2a19163\\obj\\arm64-v8a\\libSDL2_image.so",
+      "runtimeFiles": [
+        "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\build\\intermediates\\cxx\\Debug\\f2a19163\\obj\\arm64-v8a\\libSDL2.so"
+      ]
+    },
+    "uninstall::@45bd952f1071c035638d": {
+      "artifactName": "uninstall",
+      "abi": "arm64-v8a",
+      "runtimeFiles": []
+    },
+    "SDL2main::@45bd952f1071c035638d": {
+      "artifactName": "SDL2main",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\.cxx\\Debug\\f2a19163\\arm64-v8a\\_deps\\sdl2-build\\libSDL2main.a",
+      "runtimeFiles": []
+    },
+    "core::@6890427a1f51a3e7e1df": {
+      "artifactName": "core",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\.cxx\\Debug\\f2a19163\\arm64-v8a\\libcore.a",
+      "runtimeFiles": []
+    },
+    "enet::@5b730baaf47f8a9695ea": {
+      "artifactName": "enet",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\.cxx\\Debug\\f2a19163\\arm64-v8a\\_deps\\enet_src-build\\libenet.a",
+      "runtimeFiles": []
+    },
+    "SDL2::@45bd952f1071c035638d": {
+      "artifactName": "SDL2",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\build\\intermediates\\cxx\\Debug\\f2a19163\\obj\\arm64-v8a\\libSDL2.so",
+      "runtimeFiles": []
+    },
+    "SDL2-static::@45bd952f1071c035638d": {
+      "artifactName": "SDL2-static",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\.cxx\\Debug\\f2a19163\\arm64-v8a\\_deps\\sdl2-build\\libSDL2.a",
+      "runtimeFiles": []
+    },
+    "SDL2_test::@45bd952f1071c035638d": {
+      "artifactName": "SDL2_test",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\.cxx\\Debug\\f2a19163\\arm64-v8a\\_deps\\sdl2-build\\libSDL2_test.a",
+      "runtimeFiles": []
+    },
+    "mm_enet::@6890427a1f51a3e7e1df": {
+      "artifactName": "mm_enet",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\SarahRose\\PycharmProjects\\minimachines\\android\\app\\.cxx\\Debug\\f2a19163\\arm64-v8a\\libmm_enet.a",
+      "runtimeFiles": []
+    }
+  }
+}

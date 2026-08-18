@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "C:/Users/SarahRose/PycharmProjects/minimachines/android/app/.cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-subbuild/CMakeFiles/enet_src-populate"
+		},
+		{
+			"file" : "C:/Users/SarahRose/PycharmProjects/minimachines/android/app/.cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-subbuild/CMakeFiles/enet_src-populate.rule"
+		},
+		{
+			"file" : "C:/Users/SarahRose/PycharmProjects/minimachines/android/app/.cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-subbuild/CMakeFiles/enet_src-populate-complete.rule"
+		},
+		{
+			"file" : "C:/Users/SarahRose/PycharmProjects/minimachines/android/app/.cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-subbuild/enet_src-populate-prefix/src/enet_src-populate-stamp/enet_src-populate-build.rule"
+		},
+		{
+			"file" : "C:/Users/SarahRose/PycharmProjects/minimachines/android/app/.cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-subbuild/enet_src-populate-prefix/src/enet_src-populate-stamp/enet_src-populate-configure.rule"
+		},
+		{
+			"file" : "C:/Users/SarahRose/PycharmProjects/minimachines/android/app/.cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-subbuild/enet_src-populate-prefix/src/enet_src-populate-stamp/enet_src-populate-download.rule"
+		},
+		{
+			"file" : "C:/Users/SarahRose/PycharmProjects/minimachines/android/app/.cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-subbuild/enet_src-populate-prefix/src/enet_src-populate-stamp/enet_src-populate-install.rule"
+		},
+		{
+			"file" : "C:/Users/SarahRose/PycharmProjects/minimachines/android/app/.cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-subbuild/enet_src-populate-prefix/src/enet_src-populate-stamp/enet_src-populate-mkdir.rule"
+		},
+		{
+			"file" : "C:/Users/SarahRose/PycharmProjects/minimachines/android/app/.cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-subbuild/enet_src-populate-prefix/src/enet_src-populate-stamp/enet_src-populate-patch.rule"
+		},
+		{
+			"file" : "C:/Users/SarahRose/PycharmProjects/minimachines/android/app/.cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-subbuild/enet_src-populate-prefix/src/enet_src-populate-stamp/enet_src-populate-test.rule"
+		},
+		{
+			"file" : "C:/Users/SarahRose/PycharmProjects/minimachines/android/app/.cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-subbuild/enet_src-populate-prefix/src/enet_src-populate-stamp/enet_src-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"enet_src-populate"
+		],
+		"name" : "enet_src-populate"
+	}
+}

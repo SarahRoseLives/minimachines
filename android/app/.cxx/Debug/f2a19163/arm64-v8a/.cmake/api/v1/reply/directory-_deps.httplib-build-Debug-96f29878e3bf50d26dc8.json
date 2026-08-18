@@ -1,0 +1,117 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"install"
+		],
+		"files" : 
+		[
+			".cxx/Debug/f2a19163/arm64-v8a/_deps/httplib-src/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 279,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 281,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 291,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 300,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 301,
+				"parent" : 0
+			}
+		]
+	},
+	"installers" : 
+	[
+		{
+			"backtrace" : 1,
+			"component" : "Unspecified",
+			"destination" : "include",
+			"paths" : 
+			[
+				".cxx/Debug/f2a19163/arm64-v8a/_deps/httplib-src/httplib.h"
+			],
+			"type" : "file"
+		},
+		{
+			"backtrace" : 2,
+			"component" : "Unspecified",
+			"destination" : "lib/cmake/httplib",
+			"paths" : 
+			[
+				".cxx/Debug/f2a19163/arm64-v8a/_deps/httplib-build/httplibConfig.cmake",
+				".cxx/Debug/f2a19163/arm64-v8a/_deps/httplib-build/httplibConfigVersion.cmake",
+				".cxx/Debug/f2a19163/arm64-v8a/_deps/httplib-src/cmake/FindBrotli.cmake"
+			],
+			"type" : "file"
+		},
+		{
+			"backtrace" : 3,
+			"component" : "Unspecified",
+			"destination" : "lib/cmake/httplib",
+			"exportName" : "httplibTargets",
+			"exportTargets" : 
+			[
+				{
+					"id" : "httplib::@e981bf9b2240fb44b2eb",
+					"index" : 0
+				}
+			],
+			"paths" : 
+			[
+				"_deps/httplib-build/CMakeFiles/Export/lib/cmake/httplib/httplibTargets.cmake"
+			],
+			"type" : "export"
+		},
+		{
+			"backtrace" : 4,
+			"component" : "Unspecified",
+			"destination" : "share/doc/httplib",
+			"paths" : 
+			[
+				".cxx/Debug/f2a19163/arm64-v8a/_deps/httplib-src/README.md"
+			],
+			"type" : "file"
+		},
+		{
+			"backtrace" : 5,
+			"component" : "Unspecified",
+			"destination" : "share/licenses/httplib",
+			"paths" : 
+			[
+				".cxx/Debug/f2a19163/arm64-v8a/_deps/httplib-src/LICENSE"
+			],
+			"type" : "file"
+		}
+	],
+	"paths" : 
+	{
+		"build" : "_deps/httplib-build",
+		"source" : ".cxx/Debug/f2a19163/arm64-v8a/_deps/httplib-src"
+	}
+}

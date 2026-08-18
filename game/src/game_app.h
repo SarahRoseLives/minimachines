@@ -6,6 +6,7 @@
 #include "core/race.h"
 #include "camera.h"
 #include "input.h"
+#include "network_client.h"
 #include <SDL.h>
 #include <string>
 #include <vector>
@@ -20,6 +21,8 @@ struct MapEntry {
 enum class AppState {
     Menu,
     Playing,
+    MultiplayerLobby,
+    MultiplayerPlaying,
 };
 
 struct TrailPoint {
@@ -30,6 +33,7 @@ struct TrailPoint {
 struct CarVisual {
     Uint8 r, g, b;
     std::vector<TrailPoint> trails;
+    float hopScale = 1.0f;
 };
 
 class GameApp {
@@ -51,6 +55,7 @@ private:
     void updateTrails(float dt);
 
     void renderMenu(SDL_Renderer* renderer);
+    void renderServerBrowser(SDL_Renderer* renderer);
     void renderTiles(SDL_Renderer* r);
     void renderTrails(SDL_Renderer* r);
     void renderCars(SDL_Renderer* r);
@@ -59,6 +64,10 @@ private:
     void renderMinimap(SDL_Renderer* renderer);
     void renderFinishScreen(SDL_Renderer* renderer);
     void generateFallbackMap();
+
+    void connectToServer(const std::string& ip, int port);
+    void onMapReceived(const std::string& mapData);
+    void onStateReceived();
 
     AppState m_state = AppState::Menu;
     bool m_quit = false;
@@ -81,6 +90,18 @@ private:
 
     float m_checkpointFlash = 0.0f;
     int m_lastPlayerCheckpoint = 0;
+
+    NetworkClient m_net;
+    std::vector<ServerBrowserEntry> m_serverList;
+    std::string m_masterUrl;
+    char m_directIp[64] = "127.0.0.1";
+    char m_directPort[8] = "27015";
+    bool m_netInitialized = false;
+    std::string m_connectStatus;
+    bool m_mpMapLoaded = false;
+    int m_selectedServer = -1;
+    MapData m_previewMap;
+    bool m_hasPreview = false;
 };
 
 } // namespace mm

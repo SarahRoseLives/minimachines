@@ -41,6 +41,11 @@ static std::string getExeDir() {
     std::string path(buf);
     auto pos = path.find_last_of("\\/");
     return (pos != std::string::npos) ? path.substr(0, pos) : ".";
+#elif defined(__ANDROID__)
+    char* pref = SDL_GetPrefPath("minimachines", "game");
+    std::string result(pref);
+    SDL_free(pref);
+    return result;
 #else
     return ".";
 #endif
@@ -405,20 +410,20 @@ void GameApp::scanMaps() {
 
     std::vector<std::string> searchDirs = {
         getExeDir(),
-        getExeDir() + "\\..\\editor",
-        getExeDir() + "\\..\\..\\assets\\maps",
     };
 
     for (auto& dir : searchDirs) {
-        if (!fs::exists(dir)) continue;
-        for (auto& entry : fs::directory_iterator(dir)) {
-            if (entry.path().extension() == ".json") {
-                MapEntry me;
-                me.name = entry.path().stem().string();
-                me.path = entry.path().string();
-                m_maps.push_back(me);
+        try {
+            if (!fs::exists(dir)) continue;
+            for (auto& entry : fs::directory_iterator(dir)) {
+                if (entry.path().extension() == ".json") {
+                    MapEntry me;
+                    me.name = entry.path().stem().string();
+                    me.path = entry.path().string();
+                    m_maps.push_back(me);
+                }
             }
-        }
+        } catch (const std::exception&) {}
     }
 }
 
@@ -426,21 +431,29 @@ bool GameApp::init(SDL_Renderer* renderer, const char* mapPath) {
     m_renderer = renderer;
     m_input.init();
 
+    if (enet_initialize() == 0) {
+        m_net.init();
+        m_net.setOnMapReceived([this](const std::string& data) { onMapReceived(data); });
+        m_net.setOnState([this]() { onStateReceived(); });
+        m_netInitialized = true;
+    }
+
+    m_masterUrl = mm::net::DEFAULT_MASTER;
     m_mapDir = getExeDir();
     scanMaps();
 
     if (mapPath) {
         loadMap(mapPath);
-    } else if (!m_maps.empty()) {
-        m_state = AppState::Menu;
     } else {
-        loadFallback();
+        m_state = AppState::Menu;
     }
 
     return true;
 }
 
 void GameApp::shutdown() {
+    m_net.shutdown();
+    if (m_netInitialized) enet_deinitialize();
     m_input.shutdown();
 }
 
@@ -457,6 +470,19 @@ void GameApp::handleEvent(const SDL_Event& e) {
             resetAllCars();
             raceInit(m_race, m_map, static_cast<int>(m_cars.size()));
         }
+        if (e.key.keysym.sym == SDLK_ESCAPE)
+            m_state = AppState::Menu;
+    }
+
+    if (m_state == AppState::MultiplayerPlaying && e.type == SDL_KEYDOWN) {
+        if (e.key.keysym.sym == SDLK_ESCAPE) {
+            m_net.disconnect();
+            m_mpMapLoaded = false;
+            m_state = AppState::Menu;
+        }
+    }
+
+    if (m_state == AppState::MultiplayerLobby && e.type == SDL_KEYDOWN) {
         if (e.key.keysym.sym == SDLK_ESCAPE)
             m_state = AppState::Menu;
     }
@@ -486,8 +512,35 @@ void GameApp::updateTrails(float dt) {
 }
 
 void GameApp::update(float dt) {
-    if (m_state == AppState::Menu) return;
+    if (m_state == AppState::Menu || m_state == AppState::MultiplayerLobby) return;
 
+    if (m_state == AppState::MultiplayerPlaying) {
+        m_net.update();
+        PlayerInput playerIn = m_input.poll();
+        m_net.sendInput(playerIn);
+
+        updateTrails(dt);
+
+        if (m_mpMapLoaded && m_playerIndex < static_cast<int>(m_cars.size())) {
+            int sw, sh;
+            SDL_GetRendererOutputSize(m_renderer, &sw, &sh);
+            m_camera.zoom = std::min(sw, sh) / 350.0f;
+            m_camera.update(m_cars[m_playerIndex].x, m_cars[m_playerIndex].y, dt);
+
+            int ts = m_map.tileSize();
+            for (int i = 0; i < static_cast<int>(m_cars.size()); ++i) {
+                int carTX = static_cast<int>(std::floor(m_cars[i].x / ts));
+                int carTY = static_cast<int>(std::floor(m_cars[i].y / ts));
+                TileType obj = m_map.getObject(carTX, carTY);
+                TileType ground = m_map.getGround(carTX, carTY);
+                if (obj == TileType::Ramp || ground == TileType::Ramp)
+                    m_carVisuals[i].hopScale = 1.6f;
+                else
+                    m_carVisuals[i].hopScale += (1.0f - m_carVisuals[i].hopScale) * 8.0f * dt;
+            }
+        }
+        return;
+    }
     PlayerInput playerIn = m_input.poll();
 
     int prevCheckpoint = m_race.racers[m_playerIndex].currentCheckpoint;
@@ -530,7 +583,25 @@ void GameApp::update(float dt) {
 
     updateTrails(dt);
 
-    m_camera.zoom = 2.0f;
+    {
+        int sw, sh;
+        SDL_GetRendererOutputSize(m_renderer, &sw, &sh);
+        m_camera.zoom = std::min(sw, sh) / 350.0f;
+    }
+
+    int ts = m_map.tileSize();
+    for (int i = 0; i < static_cast<int>(m_cars.size()); ++i) {
+        int carTX = static_cast<int>(std::floor(m_cars[i].x / ts));
+        int carTY = static_cast<int>(std::floor(m_cars[i].y / ts));
+        TileType obj = m_map.getObject(carTX, carTY);
+        TileType ground = m_map.getGround(carTX, carTY);
+        if (obj == TileType::Ramp || ground == TileType::Ramp) {
+            m_carVisuals[i].hopScale = 1.6f;
+        } else {
+            m_carVisuals[i].hopScale += (1.0f - m_carVisuals[i].hopScale) * 8.0f * dt;
+        }
+    }
+
     m_camera.update(m_cars[m_playerIndex].x, m_cars[m_playerIndex].y, dt);
 }
 
@@ -542,6 +613,8 @@ void GameApp::render(SDL_Renderer* renderer) {
 
     if (m_state == AppState::Menu) {
         renderMenu(renderer);
+    } else if (m_state == AppState::MultiplayerLobby) {
+        renderServerBrowser(renderer);
     } else {
         renderTiles(renderer);
         renderTrails(renderer);
@@ -574,42 +647,257 @@ void GameApp::renderMenu(SDL_Renderer* renderer) {
     int sw, sh;
     SDL_GetRendererOutputSize(renderer, &sw, &sh);
 
+    float menuW = 500.0f;
     ImGui::SetNextWindowPos(ImVec2(sw / 2.0f, sh / 2.0f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(400, 0), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(menuW, 0), ImGuiCond_Always);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12, 12));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 8));
     ImGui::Begin("##menu", nullptr,
-        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings |
-        ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav);
+        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings);
 
-    ImGui::SetWindowFontScale(2.0f);
+    ImGui::SetWindowFontScale(2.5f);
+    float titleW = ImGui::CalcTextSize("MiniMachines").x;
+    ImGui::SetCursorPosX((menuW - titleW) / 2.0f);
     ImGui::Text("MiniMachines");
     ImGui::SetWindowFontScale(1.0f);
+    ImGui::Spacing();
     ImGui::Separator();
+    ImGui::Spacing();
 
     ImGui::Text("Select a map:");
-    ImGui::Separator();
+    ImGui::Spacing();
 
+    ImGui::BeginChild("map_list", ImVec2(0, 200), true);
     for (int i = 0; i < static_cast<int>(m_maps.size()); ++i) {
         bool selected = (i == m_selectedMap);
-        if (ImGui::Selectable(m_maps[i].name.c_str(), selected))
+        if (ImGui::Selectable(m_maps[i].name.c_str(), selected,
+                              ImGuiSelectableFlags_AllowDoubleClick, ImVec2(0, 30))) {
             m_selectedMap = i;
+            if (ImGui::IsMouseDoubleClicked(0))
+                loadMap(m_maps[m_selectedMap].path);
+        }
+        if (selected) ImGui::SetItemDefaultFocus();
     }
+    ImGui::EndChild();
+
+    ImGui::Spacing();
 
     if (!m_maps.empty()) {
-        ImGui::Separator();
-        if (ImGui::Button("Play", ImVec2(380, 40)))
+        if (ImGui::Button("Play", ImVec2(-1, 50)))
             loadMap(m_maps[m_selectedMap].path);
+        ImGui::Spacing();
+    }
+
+    if (ImGui::Button("Fallback Track", ImVec2(-1, 50)))
+        loadFallback();
+    ImGui::Spacing();
+
+    if (ImGui::Button("Random Track", ImVec2(-1, 50)))
+        loadRandomMap();
+    ImGui::Spacing();
+
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    if (ImGui::Button("Multiplayer", ImVec2(-1, 50)))
+        m_state = AppState::MultiplayerLobby;
+    ImGui::Spacing();
+
+    if (ImGui::Button("Quit", ImVec2(-1, 40)))
+        m_quit = true;
+
+    ImGui::Separator();
+    ImGui::Text("D-Pad: Navigate | A: Select | B: Back");
+
+    ImGui::End();
+    ImGui::PopStyleVar(2);
+}
+
+void GameApp::connectToServer(const std::string& ip, int port) {
+    m_connectStatus = "Connecting...";
+    if (m_net.connect(ip, port)) {
+        m_state = AppState::MultiplayerPlaying;
+        m_mpMapLoaded = false;
+        m_connectStatus = "Connected!";
+    } else {
+        m_connectStatus = "Connection failed.";
+    }
+}
+
+void GameApp::onMapReceived(const std::string& mapData) {
+    MapData loaded;
+    std::string tmpPath = getExeDir() + "\\_net_map.json";
+    FILE* f = fopen(tmpPath.c_str(), "wb");
+    if (f) {
+        fwrite(mapData.data(), 1, mapData.size(), f);
+        fclose(f);
+        if (MapSerializer::loadFromFile(loaded, tmpPath)) {
+            m_map = std::move(loaded);
+            m_cars.clear();
+            m_carVisuals.clear();
+            for (int i = 0; i < mm::net::MAX_PLAYERS; ++i) {
+                CarState car;
+                m_cars.push_back(car);
+                CarVisual vis;
+                vis.r = CAR_COLORS[i % 4][0];
+                vis.g = CAR_COLORS[i % 4][1];
+                vis.b = CAR_COLORS[i % 4][2];
+                m_carVisuals.push_back(vis);
+            }
+            m_race = RaceData();
+            m_camera.x = m_cars[0].x;
+            m_camera.y = m_cars[0].y;
+            m_mpMapLoaded = true;
+        }
+        remove(tmpPath.c_str());
+    }
+}
+
+void GameApp::onStateReceived() {
+    auto& netCars = m_net.getCarStates();
+    auto& netRace = m_net.getRaceData();
+    m_playerIndex = m_net.getPlayerIndex();
+
+    for (int i = 0; i < static_cast<int>(netCars.size()) && i < static_cast<int>(m_cars.size()); ++i) {
+        m_cars[i] = netCars[i];
+    }
+    m_race.state = netRace.state;
+    m_race.raceTime = netRace.raceTime;
+    m_race.totalLaps = netRace.totalLaps;
+    m_race.racers = netRace.racers;
+
+    if (m_mpMapLoaded && m_playerIndex < static_cast<int>(m_cars.size())) {
+        m_camera.update(m_cars[m_playerIndex].x, m_cars[m_playerIndex].y, 1.0f / 30.0f);
+    }
+}
+
+void GameApp::renderServerBrowser(SDL_Renderer* renderer) {
+    int sw, sh;
+    SDL_GetRendererOutputSize(renderer, &sw, &sh);
+
+    ImGui::SetNextWindowPos(ImVec2(sw / 2.0f, sh / 2.0f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(700, 600), ImGuiCond_FirstUseEver);
+    ImGui::Begin("Multiplayer", nullptr, ImGuiWindowFlags_NoCollapse);
+
+    ImGui::Text("Server Browser");
+    ImGui::Separator();
+
+    ImGui::InputText("Master Server", (char*)m_masterUrl.c_str(), m_masterUrl.size() + 1,
+                     ImGuiInputTextFlags_ReadOnly);
+    ImGui::SameLine();
+    if (ImGui::Button("Refresh")) {
+        m_serverList = m_net.queryMaster(m_masterUrl);
+        m_selectedServer = -1;
+        m_hasPreview = false;
     }
 
     ImGui::Separator();
-    if (ImGui::Button("Fallback Track", ImVec2(380, 40)))
-        loadFallback();
+    ImGui::Text("Servers:");
 
-    if (ImGui::Button("Random Track", ImVec2(380, 40)))
-        loadRandomMap();
+    ImGui::BeginChild("server_browser_area", ImVec2(0, -80), false);
+
+    ImGui::BeginChild("server_list", ImVec2(300, 0), true);
+    for (int i = 0; i < static_cast<int>(m_serverList.size()); ++i) {
+        auto& s = m_serverList[i];
+        char label[256];
+        snprintf(label, sizeof(label), "%s:%d\n%s\n%d/%d players",
+                 s.ip.c_str(), s.port, s.mapName.c_str(), s.players, s.maxPlayers);
+        bool selected = (i == m_selectedServer);
+        if (ImGui::Selectable(label, selected)) {
+            m_selectedServer = i;
+            snprintf(m_directIp, sizeof(m_directIp), "%s", s.ip.c_str());
+            snprintf(m_directPort, sizeof(m_directPort), "%d", s.port);
+
+            if (!s.mapData.empty()) {
+                std::string tmpPath = getExeDir() + "\\_preview_map.json";
+                FILE* f = fopen(tmpPath.c_str(), "wb");
+                if (f) {
+                    fwrite(s.mapData.data(), 1, s.mapData.size(), f);
+                    fclose(f);
+                    if (MapSerializer::loadFromFile(m_previewMap, tmpPath))
+                        m_hasPreview = true;
+                    else
+                        m_hasPreview = false;
+                    remove(tmpPath.c_str());
+                }
+            } else {
+                m_hasPreview = false;
+            }
+        }
+    }
+    ImGui::EndChild();
+
+    ImGui::SameLine();
+
+    ImGui::BeginChild("map_preview", ImVec2(0, 0), true);
+    if (m_hasPreview) {
+        ImGui::Text("Map Preview: %s", m_previewMap.name().c_str());
+        ImGui::Text("Size: %dx%d", m_previewMap.width(), m_previewMap.height());
+
+        ImVec2 avail = ImGui::GetContentRegionAvail();
+        int previewSize = static_cast<int>(std::min(avail.x, avail.y));
+        if (previewSize < 50) previewSize = 50;
+
+        int mapW = m_previewMap.width();
+        int mapH = m_previewMap.height();
+        float scale = (float)previewSize / std::max(mapW, mapH);
+        int drawW = (int)(mapW * scale);
+        int drawH = (int)(mapH * scale);
+
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        ImVec2 cursor = ImGui::GetCursorScreenPos();
+
+        drawList->AddRectFilled(cursor, ImVec2(cursor.x + drawW, cursor.y + drawH),
+                                IM_COL32(0, 0, 0, 255));
+
+        int step = std::max(1, mapW / drawW);
+        for (int ty = 0; ty < mapH; ty += step) {
+            for (int tx = 0; tx < mapW; tx += step) {
+                TileType ground = m_previewMap.getGround(tx, ty);
+                TileType obj = m_previewMap.getObject(tx, ty);
+                TileType display = (obj != TileType::Empty) ? obj : ground;
+                const TileInfo* info = findTileInfo(display);
+                if (!info) continue;
+
+                int px = (int)(tx * scale);
+                int py = (int)(ty * scale);
+                int ps = std::max(1, (int)(step * scale));
+
+                ImU32 col = IM_COL32(info->r, info->g, info->b, 255);
+                drawList->AddRectFilled(
+                    ImVec2(cursor.x + px, cursor.y + py),
+                    ImVec2(cursor.x + px + ps, cursor.y + py + ps),
+                    col);
+            }
+        }
+
+        ImGui::Dummy(ImVec2(drawW, drawH));
+    } else {
+        ImGui::Text("Select a server to preview its map");
+    }
+    ImGui::EndChild();
+
+    ImGui::EndChild();
 
     ImGui::Separator();
-    if (ImGui::Button("Quit", ImVec2(380, 30)))
-        m_quit = true;
+    ImGui::PushItemWidth(200);
+    ImGui::InputText("IP", m_directIp, sizeof(m_directIp));
+    ImGui::SameLine();
+    ImGui::PushItemWidth(80);
+    ImGui::InputText("Port", m_directPort, sizeof(m_directPort));
+    ImGui::PopItemWidth();
+    ImGui::SameLine();
+    if (ImGui::Button("Connect")) {
+        connectToServer(m_directIp, atoi(m_directPort));
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Back"))
+        m_state = AppState::Menu;
+    ImGui::PopItemWidth();
+
+    if (!m_connectStatus.empty()) {
+        ImGui::Text("%s", m_connectStatus.c_str());
+    }
 
     ImGui::End();
 }
@@ -736,7 +1024,7 @@ void GameApp::renderCar(SDL_Renderer* r, int idx) {
     sp.x += sw / 2;
     sp.y += sh / 2;
 
-    float carR = m_carCfg.radius * m_camera.zoom;
+    float carR = m_carCfg.radius * m_camera.zoom * vis.hopScale;
     float cosH = std::cos(car.heading);
     float sinH = std::sin(car.heading);
 
@@ -762,7 +1050,9 @@ void GameApp::renderHUD(SDL_Renderer* renderer) {
     int sw, sh;
     SDL_GetRendererOutputSize(renderer, &sw, &sh);
 
-    ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always);
+    int safeMargin = std::max(60, sh / 20);
+
+    ImGui::SetNextWindowPos(ImVec2(safeMargin, safeMargin), ImGuiCond_Always);
     ImGui::SetNextWindowBgAlpha(0.6f);
     ImGui::Begin("##hud", nullptr,
         ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
@@ -838,8 +1128,9 @@ void GameApp::renderMinimap(SDL_Renderer* r) {
     float scale = (float)minimapSize / std::max(mapW, mapH);
     int drawW = (int)(mapW * scale);
     int drawH = (int)(mapH * scale);
-    int ox = sw - drawW - 10;
-    int oy = sh - drawH - 10;
+    int safeMargin = std::max(60, sh / 20);
+    int ox = sw - drawW - safeMargin;
+    int oy = sh - drawH - safeMargin;
 
     SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(r, 0, 0, 0, 160);

@@ -1,0 +1,3 @@
+C:/Users/SarahRose/PycharmProjects/minimachines/android/app/.cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-subbuild/CMakeFiles/enet_src-populate.dir
+C:/Users/SarahRose/PycharmProjects/minimachines/android/app/.cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-subbuild/CMakeFiles/edit_cache.dir
+C:/Users/SarahRose/PycharmProjects/minimachines/android/app/.cxx/Debug/f2a19163/arm64-v8a/_deps/enet_src-subbuild/CMakeFiles/rebuild_cache.dir
