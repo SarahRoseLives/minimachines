@@ -1,0 +1,25 @@
+# Build output
+build/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# ImGui layout (auto-generated)
+imgui.ini
+
+# Compiled objects
+*.o
+*.obj
+*.exe
+*.dll
+*.a
+*.lib
+*.so
+*.dylib

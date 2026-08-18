@@ -1,0 +1,21 @@
+{
+  "name": "default",
+  "tileWidth": 32,
+  "tileHeight": 32,
+  "tiles": [
+    {"id": 1, "name": "Grass"},
+    {"id": 2, "name": "Road"},
+    {"id": 3, "name": "Dirt"},
+    {"id": 4, "name": "Sand"},
+    {"id": 5, "name": "Ice"},
+    {"id": 6, "name": "Water"},
+    {"id": 7, "name": "Wall"},
+    {"id": 8, "name": "Barrier"},
+    {"id": 9, "name": "Ramp"},
+    {"id": 10, "name": "Boost"},
+    {"id": 11, "name": "Oil"},
+    {"id": 12, "name": "Start"},
+    {"id": 13, "name": "Checkpoint"},
+    {"id": 14, "name": "Finish"}
+  ]
+}
