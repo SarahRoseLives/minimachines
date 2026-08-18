@@ -4,6 +4,7 @@
 #include <fstream>
 #include <cstdio>
 #include <cstring>
+#include <cmath>
 
 namespace mm {
 
@@ -78,19 +79,34 @@ void ServerGame::onConnect(ENetPeer* peer) {
     snprintf(p.name, sizeof(p.name), "Player%d", slot);
     peer->data = reinterpret_cast<void*>(static_cast<intptr_t>(slot));
 
-    float spawnX = m_map.width() / 2.0f * m_map.tileSize();
-    float spawnY = m_map.height() / 2.0f * m_map.tileSize();
+    float ts = m_map.tileSize();
+    float spawnX = m_map.width() / 2.0f * ts;
+    float spawnY = m_map.height() / 2.0f * ts;
     float spawnAngle = 0.0f;
+
     if (!m_map.spawns().empty()) {
-        auto& s = m_map.spawns()[0];
-        spawnX = (s.x + 0.5f) * m_map.tileSize();
-        spawnY = (s.y + 0.5f) * m_map.tileSize();
-        spawnAngle = s.angle;
+        if (slot < static_cast<int>(m_map.spawns().size())) {
+            auto& s = m_map.spawns()[slot];
+            spawnX = (s.x + 0.5f) * ts;
+            spawnY = (s.y + 0.5f) * ts;
+            spawnAngle = s.angle;
+        } else {
+            auto& s = m_map.spawns()[0];
+            float cosA = std::cos(s.angle);
+            float sinA = std::sin(s.angle);
+            float depth = slot * 20.0f;
+            float side = ((slot % 2) == 0 ? -1.0f : 1.0f) * 15.0f;
+            spawnX = (s.x + 0.5f) * ts - cosA * depth + (-sinA) * side;
+            spawnY = (s.y + 0.5f) * ts - sinA * depth + cosA * side;
+            spawnAngle = s.angle;
+        }
     }
+
     p.car.x = spawnX;
     p.car.y = spawnY;
     p.car.heading = spawnAngle;
     p.lastInput = {};
+    m_playerCountChanged = true;
 
     PacketHeader hdr;
     hdr.type = PacketType::S2C_MAP_DATA;
@@ -112,6 +128,7 @@ void ServerGame::onDisconnect(ENetPeer* peer) {
     if (idx >= 0 && idx < m_maxPlayers) {
         m_players[idx].connected = false;
         m_players[idx].peer = nullptr;
+        m_playerCountChanged = true;
         fprintf(stderr, "Player %d disconnected\n", idx);
     }
 }
@@ -215,7 +232,7 @@ void ServerGame::sendState() {
 
     if (cars.empty()) return;
 
-    net::StatePacket state = net::packState(cars, m_race);
+    net::StatePacket state = net::packState(cars, m_race, indices);
 
     PacketHeader hdr;
     hdr.type = PacketType::S2C_STATE;

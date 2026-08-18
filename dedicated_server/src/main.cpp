@@ -118,7 +118,7 @@ int main(int argc, char* argv[]) {
         server.sendState();
 
         auto elapsedSinceHeartbeat = std::chrono::duration_cast<std::chrono::seconds>(now - lastHeartbeat).count();
-        if (elapsedSinceHeartbeat >= 30) {
+        if (elapsedSinceHeartbeat >= 10 || server.takePlayerCountChanged()) {
             heartbeatMaster(masterUrl, port, server.getPlayerCount());
             lastHeartbeat = now;
         }

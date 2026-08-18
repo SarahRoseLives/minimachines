@@ -42,6 +42,7 @@ public:
     const std::vector<CarState>& getCarStates() const { return m_carStates; }
     const RaceData& getRaceData() const { return m_raceData; }
     int getPlayerIndex() const { return m_playerIndex; }
+    uint16_t getConnectedMask() const { return m_connectedMask; }
 
     void setOnMapReceived(std::function<void(const std::string&)> cb) { m_onMapReceived = cb; }
     void setOnState(std::function<void()> cb) { m_onState = cb; }
@@ -57,6 +58,7 @@ private:
 
     std::vector<CarState> m_carStates;
     RaceData m_raceData;
+    uint16_t m_connectedMask = 0;
 
     std::function<void(const std::string&)> m_onMapReceived;
     std::function<void()> m_onState;

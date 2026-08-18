@@ -101,7 +101,7 @@ void NetworkClient::update() {
                 if (event.packet->dataLength >= sizeof(PacketHeader) + sizeof(StatePacket)) {
                     StatePacket state;
                     memcpy(&state, event.packet->data + sizeof(PacketHeader), sizeof(StatePacket));
-                    unpackState(state, m_carStates, m_raceData);
+                    unpackState(state, m_carStates, m_raceData, m_connectedMask);
                     if (m_onState) m_onState();
                 }
             }

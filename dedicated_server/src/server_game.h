@@ -36,12 +36,14 @@ public:
     const std::string& getMapData() const { return m_mapData; }
     int getPlayerCount() const;
     int getMaxPlayers() const { return m_maxPlayers; }
+    bool takePlayerCountChanged() { bool v = m_playerCountChanged; m_playerCountChanged = false; return v; }
 
 private:
     void broadcastReliable(const void* data, size_t size);
     void sendReliable(ENetPeer* peer, const void* data, size_t size);
 
     bool m_running = false;
+    bool m_playerCountChanged = false;
     int m_maxPlayers = 8;
     MapData m_map;
     std::string m_mapName;

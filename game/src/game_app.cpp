@@ -528,6 +528,8 @@ void GameApp::handleEvent(const SDL_Event& e) {
 
 void GameApp::updateTrails(float dt) {
     for (int i = 0; i < static_cast<int>(m_cars.size()); ++i) {
+        if (m_state == AppState::MultiplayerPlaying && !(m_mpConnectedMask & (1 << i)))
+            continue;
         auto& car = m_cars[i];
         auto& vis = m_carVisuals[i];
 
@@ -567,6 +569,7 @@ void GameApp::update(float dt) {
 
             int ts = m_map.tileSize();
             for (int i = 0; i < static_cast<int>(m_cars.size()); ++i) {
+                if (!(m_mpConnectedMask & (1 << i))) continue;
                 int carTX = static_cast<int>(std::floor(m_cars[i].x / ts));
                 int carTY = static_cast<int>(std::floor(m_cars[i].y / ts));
                 TileType obj = m_map.getObject(carTX, carTY);
@@ -729,14 +732,49 @@ void GameApp::onStateReceived() {
     auto& netCars = m_net.getCarStates();
     auto& netRace = m_net.getRaceData();
     m_playerIndex = m_net.getPlayerIndex();
+    uint16_t mask = m_net.getConnectedMask();
+    m_mpConnectedMask = mask;
 
-    for (int i = 0; i < static_cast<int>(netCars.size()) && i < static_cast<int>(m_cars.size()); ++i) {
-        m_cars[i] = netCars[i];
+    // Clear all car positions first
+    for (int i = 0; i < static_cast<int>(m_cars.size()); ++i) {
+        m_cars[i] = CarState{};
     }
+
+    // Apply received car states to their correct player slots
+    for (int i = 0; i < static_cast<int>(netCars.size()); ++i) {
+        // Find the i-th set bit in the mask to get the actual player index
+        int slot = -1;
+        int count = 0;
+        for (int b = 0; b < net::MAX_PLAYERS; ++b) {
+            if (mask & (1 << b)) {
+                if (count == i) { slot = b; break; }
+                count++;
+            }
+        }
+        if (slot >= 0 && slot < static_cast<int>(m_cars.size())) {
+            m_cars[slot] = netCars[i];
+        }
+    }
+
     m_race.state = netRace.state;
     m_race.raceTime = netRace.raceTime;
     m_race.totalLaps = netRace.totalLaps;
-    m_race.racers = netRace.racers;
+    // Apply racer data using connected mask
+    m_race.racers.clear();
+    m_race.racers.resize(net::MAX_PLAYERS);
+    for (int i = 0; i < static_cast<int>(netRace.racers.size()); ++i) {
+        int slot = -1;
+        int count = 0;
+        for (int b = 0; b < net::MAX_PLAYERS; ++b) {
+            if (mask & (1 << b)) {
+                if (count == i) { slot = b; break; }
+                count++;
+            }
+        }
+        if (slot >= 0 && slot < static_cast<int>(m_race.racers.size())) {
+            m_race.racers[slot] = netRace.racers[i];
+        }
+    }
 
     if (m_mpMapLoaded && m_playerIndex < static_cast<int>(m_cars.size())) {
         m_camera.update(m_cars[m_playerIndex].x, m_cars[m_playerIndex].y, 1.0f / 30.0f);
@@ -832,6 +870,8 @@ void GameApp::renderTrails(SDL_Renderer* r) {
     SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
 
     for (int i = 0; i < static_cast<int>(m_cars.size()); ++i) {
+        if (m_state == AppState::MultiplayerPlaying && !(m_mpConnectedMask & (1 << i)))
+            continue;
         auto& vis = m_carVisuals[i];
         for (auto& tp : vis.trails) {
             SDL_Point sp = m_camera.worldToScreen(tp.x, tp.y);
@@ -850,6 +890,8 @@ void GameApp::renderTrails(SDL_Renderer* r) {
 
 void GameApp::renderCars(SDL_Renderer* r) {
     for (int i = 0; i < static_cast<int>(m_cars.size()); ++i) {
+        if (m_state == AppState::MultiplayerPlaying && !(m_mpConnectedMask & (1 << i)))
+            continue;
         renderCar(r, i);
     }
 }
@@ -903,17 +945,33 @@ void GameApp::renderHUD(SDL_Renderer* renderer) {
     ImGui::Text("Map: %s", m_map.name().c_str());
     ImGui::Separator();
 
-    if (m_race.state == RaceState::Countdown) {
+    if (m_race.state == RaceState::Waiting) {
+        ImGui::Text("Waiting for players...");
+        ImGui::Text("Need at least 2 players to start");
+    } else if (m_race.state == RaceState::Countdown) {
         ImGui::Text("Starting in: %.0f", std::ceil(m_race.countdown));
     } else if (m_race.state == RaceState::Racing) {
         auto& playerRacer = m_race.racers[m_playerIndex];
         int pos = raceGetPosition(m_race, m_playerIndex);
+
+        int racerCount = 0;
+        for (auto& r : m_race.racers)
+            if (r.currentLap > 0 || r.currentCheckpoint > 0 || m_race.state == RaceState::Racing) racerCount++;
+        if (m_state == AppState::MultiplayerPlaying) {
+            racerCount = 0;
+            for (int i = 0; i < net::MAX_PLAYERS; ++i) {
+                if (!(m_mpConnectedMask & (1 << i))) continue;
+                if (i < static_cast<int>(m_race.racers.size()))
+                    racerCount++;
+            }
+        }
+
         const char* posStr = "th";
         if (pos == 1) posStr = "st";
         else if (pos == 2) posStr = "nd";
         else if (pos == 3) posStr = "rd";
 
-        ImGui::Text("Position: %d%s / %d", pos, posStr, static_cast<int>(m_cars.size()));
+        ImGui::Text("Position: %d%s / %d", pos, posStr, racerCount);
         ImGui::Text("Lap: %d / %d", playerRacer.currentLap + 1, m_race.totalLaps);
         ImGui::Text("Checkpoint: %d / %d", playerRacer.currentCheckpoint,
                     static_cast<int>(m_map.checkpoints().size()));
@@ -924,13 +982,22 @@ void GameApp::renderHUD(SDL_Renderer* renderer) {
 
         ImGui::Separator();
         for (int i = 0; i < static_cast<int>(m_cars.size()); ++i) {
+            if (m_state == AppState::MultiplayerPlaying && !(m_mpConnectedMask & (1 << i)))
+                continue;
             auto& r = m_race.racers[i];
             auto& vis = m_carVisuals[i];
             ImVec4 col(vis.r / 255.0f, vis.g / 255.0f, vis.b / 255.0f, 1.0f);
-            if (r.finished) {
-                ImGui::TextColored(col, "%s: FINISHED (%.2f)", i == 0 ? "You" : "Bot", r.finishTime);
+            const char* label;
+            if (m_state == AppState::MultiplayerPlaying) {
+                if (i == m_playerIndex) label = "You";
+                else label = "Player";
             } else {
-                ImGui::TextColored(col, "%s: Lap %d, CP %d", i == 0 ? "You" : "Bot",
+                label = (i == 0) ? "You" : "Bot";
+            }
+            if (r.finished) {
+                ImGui::TextColored(col, "%s: FINISHED (%.2f)", label, r.finishTime);
+            } else {
+                ImGui::TextColored(col, "%s: Lap %d, CP %d", label,
                                    r.currentLap + 1, r.currentCheckpoint);
             }
         }
@@ -997,6 +1064,8 @@ void GameApp::renderMinimap(SDL_Renderer* r) {
     }
 
     for (int i = 0; i < static_cast<int>(m_cars.size()); ++i) {
+        if (m_state == AppState::MultiplayerPlaying && !(m_mpConnectedMask & (1 << i)))
+            continue;
         auto& car = m_cars[i];
         auto& vis = m_carVisuals[i];
         int cx = ox + (int)(car.x / m_map.tileSize() * scale);

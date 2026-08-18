@@ -101,6 +101,7 @@ private:
     std::string m_masterUrl;
     bool m_netInitialized = false;
     bool m_mpMapLoaded = false;
+    uint16_t m_mpConnectedMask = 0;
 };
 
 } // namespace mm
