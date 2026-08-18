@@ -23,6 +23,15 @@ static const TileInfo* findTileInfo(TileType type) {
     return nullptr;
 }
 
+static const int NUM_BOTS = 3;
+
+static const Uint8 CAR_COLORS[][3] = {
+    {51, 153, 255},
+    {255, 80, 80},
+    {80, 255, 80},
+    {255, 255, 80},
+};
+
 static std::string getExeDir() {
 #ifdef _WIN32
     char buf[MAX_PATH];
@@ -33,28 +42,6 @@ static std::string getExeDir() {
 #else
     return ".";
 #endif
-}
-
-void GameApp::scanMaps() {
-    m_maps.clear();
-
-    std::vector<std::string> searchDirs = {
-        getExeDir(),
-        getExeDir() + "\\..\\editor",
-        getExeDir() + "\\..\\..\\assets\\maps",
-    };
-
-    for (auto& dir : searchDirs) {
-        if (!fs::exists(dir)) continue;
-        for (auto& entry : fs::directory_iterator(dir)) {
-            if (entry.path().extension() == ".json") {
-                MapEntry me;
-                me.name = entry.path().stem().string();
-                me.path = entry.path().string();
-                m_maps.push_back(me);
-            }
-        }
-    }
 }
 
 void GameApp::generateFallbackMap() {
@@ -91,69 +78,82 @@ void GameApp::generateFallbackMap() {
     m_map.setLaps(3);
 }
 
-void GameApp::resetCar() {
-    float spawnX = m_map.width() / 2.0f;
-    float spawnY = m_map.height() / 2.0f;
-    float spawnAngle = 0.0f;
-    bool found = false;
+void GameApp::spawnBots() {
+    int ts = m_map.tileSize();
 
-    // Check spawn points first (they have angle data)
-    if (!m_map.spawns().empty()) {
-        auto& s = m_map.spawns()[0];
-        spawnX = s.x + 0.5f;
-        spawnY = s.y + 0.5f;
-        spawnAngle = s.angle;
-        found = true;
-    }
+    for (int i = 0; i < NUM_BOTS; ++i) {
+        CarState car;
+        int spawnIdx = i + 1;
 
-    // Check objects layer for Start tile
-    if (!found) {
-        for (int y = 0; y < m_map.height() && !found; ++y) {
-            for (int x = 0; x < m_map.width() && !found; ++x) {
-                if (m_map.getObject(x, y) == TileType::Start) {
-                    spawnX = x + 0.5f;
-                    spawnY = y + 0.5f;
-                    found = true;
-                }
-            }
+        if (spawnIdx < static_cast<int>(m_map.spawns().size())) {
+            auto& s = m_map.spawns()[spawnIdx];
+            car.x = (s.x + 0.5f) * ts;
+            car.y = (s.y + 0.5f) * ts;
+            car.heading = s.angle;
+        } else if (!m_map.spawns().empty()) {
+            auto& s = m_map.spawns()[0];
+            float cosA = std::cos(s.angle);
+            float sinA = std::sin(s.angle);
+            float offset = spawnIdx * 20.0f;
+            float sideOffset = ((i % 2) == 0 ? -1.0f : 1.0f) * 15.0f;
+            car.x = (s.x + 0.5f) * ts - cosA * offset + (-sinA) * sideOffset;
+            car.y = (s.y + 0.5f) * ts - sinA * offset + cosA * sideOffset;
+            car.heading = s.angle;
+        } else {
+            car.x = (m_map.width() / 2.0f + i * 2) * ts;
+            car.y = m_map.height() / 2.0f * ts;
         }
-    }
 
-    // Check ground layer for Start tile
-    if (!found) {
-        for (int y = 0; y < m_map.height() && !found; ++y) {
-            for (int x = 0; x < m_map.width() && !found; ++x) {
-                if (m_map.getGround(x, y) == TileType::Start) {
-                    spawnX = x + 0.5f;
-                    spawnY = y + 0.5f;
-                    found = true;
-                }
-            }
+        m_cars.push_back(car);
+
+        BotConfig cfg;
+        cfg.aggression = 0.6f + (i * 0.1f);
+        cfg.accuracy = 0.7f + (i * 0.05f);
+        m_botConfigs.push_back(cfg);
+
+        CarVisual vis;
+        vis.r = CAR_COLORS[i + 1][0];
+        vis.g = CAR_COLORS[i + 1][1];
+        vis.b = CAR_COLORS[i + 1][2];
+        m_carVisuals.push_back(vis);
+    }
+}
+
+void GameApp::resetAllCars() {
+    int ts = m_map.tileSize();
+
+    for (int i = 0; i < static_cast<int>(m_cars.size()); ++i) {
+        if (i < static_cast<int>(m_map.spawns().size())) {
+            auto& s = m_map.spawns()[i];
+            m_cars[i].x = (s.x + 0.5f) * ts;
+            m_cars[i].y = (s.y + 0.5f) * ts;
+            m_cars[i].heading = s.angle;
+        } else if (!m_map.spawns().empty()) {
+            auto& s = m_map.spawns()[0];
+            float cosA = std::cos(s.angle);
+            float sinA = std::sin(s.angle);
+            float offset = i * 20.0f;
+            float sideOffset = ((i % 2) == 0 ? -1.0f : 1.0f) * 15.0f;
+            m_cars[i].x = (s.x + 0.5f) * ts - cosA * offset + (-sinA) * sideOffset;
+            m_cars[i].y = (s.y + 0.5f) * ts - sinA * offset + cosA * sideOffset;
+            m_cars[i].heading = s.angle;
+        } else {
+            m_cars[i].x = (m_map.width() / 2.0f + i * 2) * ts;
+            m_cars[i].y = m_map.height() / 2.0f * ts;
+            m_cars[i].heading = 0.0f;
         }
+
+        m_cars[i].vx = 0.0f;
+        m_cars[i].vy = 0.0f;
+        m_cars[i].speed = 0.0f;
+        m_cars[i].forwardSpeed = 0.0f;
     }
 
-    // Fall back to first Road tile
-    if (!found) {
-        for (int y = 0; y < m_map.height() && !found; ++y) {
-            for (int x = 0; x < m_map.width() && !found; ++x) {
-                if (m_map.getGround(x, y) == TileType::Road) {
-                    spawnX = x + 0.5f;
-                    spawnY = y + 0.5f;
-                    found = true;
-                }
-            }
-        }
-    }
+    for (auto& vis : m_carVisuals)
+        vis.trails.clear();
 
-    m_car.x = spawnX * m_map.tileSize();
-    m_car.y = spawnY * m_map.tileSize();
-    m_car.heading = spawnAngle;
-    m_car.vx = 0.0f;
-    m_car.vy = 0.0f;
-    m_car.speed = 0.0f;
-    m_car.forwardSpeed = 0.0f;
-    m_prevCarX = m_car.x;
-    m_prevCarY = m_car.y;
+    m_lastPlayerCheckpoint = 0;
+    m_checkpointFlash = 0.0f;
 }
 
 void GameApp::loadMap(const std::string& path) {
@@ -165,20 +165,71 @@ void GameApp::loadMap(const std::string& path) {
         generateFallbackMap();
     }
 
-    resetCar();
-    raceInit(m_race, m_map);
-    m_camera.x = m_car.x;
-    m_camera.y = m_car.y;
+    m_cars.clear();
+    m_botConfigs.clear();
+    m_carVisuals.clear();
+    m_playerIndex = 0;
+
+    CarState playerCar;
+    m_cars.push_back(playerCar);
+    CarVisual playerVis;
+    playerVis.r = CAR_COLORS[0][0];
+    playerVis.g = CAR_COLORS[0][1];
+    playerVis.b = CAR_COLORS[0][2];
+    m_carVisuals.push_back(playerVis);
+
+    spawnBots();
+    resetAllCars();
+    raceInit(m_race, m_map, static_cast<int>(m_cars.size()));
+    m_camera.x = m_cars[0].x;
+    m_camera.y = m_cars[0].y;
     m_state = AppState::Playing;
 }
 
 void GameApp::loadFallback() {
     generateFallbackMap();
-    resetCar();
-    raceInit(m_race, m_map);
-    m_camera.x = m_car.x;
-    m_camera.y = m_car.y;
+
+    m_cars.clear();
+    m_botConfigs.clear();
+    m_carVisuals.clear();
+    m_playerIndex = 0;
+
+    CarState playerCar;
+    m_cars.push_back(playerCar);
+    CarVisual playerVis;
+    playerVis.r = CAR_COLORS[0][0];
+    playerVis.g = CAR_COLORS[0][1];
+    playerVis.b = CAR_COLORS[0][2];
+    m_carVisuals.push_back(playerVis);
+
+    spawnBots();
+    resetAllCars();
+    raceInit(m_race, m_map, static_cast<int>(m_cars.size()));
+    m_camera.x = m_cars[0].x;
+    m_camera.y = m_cars[0].y;
     m_state = AppState::Playing;
+}
+
+void GameApp::scanMaps() {
+    m_maps.clear();
+
+    std::vector<std::string> searchDirs = {
+        getExeDir(),
+        getExeDir() + "\\..\\editor",
+        getExeDir() + "\\..\\..\\assets\\maps",
+    };
+
+    for (auto& dir : searchDirs) {
+        if (!fs::exists(dir)) continue;
+        for (auto& entry : fs::directory_iterator(dir)) {
+            if (entry.path().extension() == ".json") {
+                MapEntry me;
+                me.name = entry.path().stem().string();
+                me.path = entry.path().string();
+                m_maps.push_back(me);
+            }
+        }
+    }
 }
 
 bool GameApp::init(SDL_Renderer* renderer, const char* mapPath) {
@@ -212,30 +263,85 @@ void GameApp::handleEvent(const SDL_Event& e) {
     m_input.handleEvent(e);
 
     if (m_state == AppState::Playing && e.type == SDL_KEYDOWN) {
-        if (e.key.keysym.sym == SDLK_r)
-            resetCar();
+        if (e.key.keysym.sym == SDLK_r) {
+            resetAllCars();
+            raceInit(m_race, m_map, static_cast<int>(m_cars.size()));
+        }
         if (e.key.keysym.sym == SDLK_ESCAPE)
             m_state = AppState::Menu;
+    }
+}
+
+void GameApp::updateTrails(float dt) {
+    for (int i = 0; i < static_cast<int>(m_cars.size()); ++i) {
+        auto& car = m_cars[i];
+        auto& vis = m_carVisuals[i];
+
+        if (car.speed > 50.0f) {
+            TrailPoint tp;
+            tp.x = car.x;
+            tp.y = car.y;
+            tp.age = 0.0f;
+            vis.trails.push_back(tp);
+        }
+
+        for (auto it = vis.trails.begin(); it != vis.trails.end();) {
+            it->age += dt;
+            if (it->age > 2.0f)
+                it = vis.trails.erase(it);
+            else
+                ++it;
+        }
     }
 }
 
 void GameApp::update(float dt) {
     if (m_state == AppState::Menu) return;
 
-    PlayerInput in = m_input.poll();
-    m_prevCarX = m_car.x;
-    m_prevCarY = m_car.y;
+    PlayerInput playerIn = m_input.poll();
 
-    if (m_race.state == RaceState::Racing) {
-        carUpdate(m_car, in, m_carCfg, m_map, dt);
-    } else if (m_race.state == RaceState::Countdown) {
-        carUpdate(m_car, PlayerInput{}, m_carCfg, m_map, dt);
+    int prevCheckpoint = m_race.racers[m_playerIndex].currentCheckpoint;
+
+    std::vector<CarPosition> carPositions;
+    for (auto& car : m_cars) {
+        CarPosition cp;
+        cp.x = car.x;
+        cp.y = car.y;
+        cp.prevX = car.x;
+        cp.prevY = car.y;
+        carPositions.push_back(cp);
     }
 
-    raceUpdate(m_race, m_car.x, m_car.y, m_map, dt, m_prevCarX, m_prevCarY);
+    for (int i = 0; i < static_cast<int>(m_cars.size()); ++i) {
+        if (m_race.state == RaceState::Racing) {
+            if (i == m_playerIndex) {
+                carUpdate(m_cars[i], playerIn, m_carCfg, m_map, dt);
+            } else {
+                PlayerInput botIn = botComputeInput(m_cars[i], m_race.racers[i], m_map, m_botConfigs[i - 1]);
+                carUpdate(m_cars[i], botIn, m_carCfg, m_map, dt);
+            }
+        } else if (m_race.state == RaceState::Countdown) {
+            carUpdate(m_cars[i], PlayerInput{}, m_carCfg, m_map, dt);
+        }
+        carPositions[i].x = m_cars[i].x;
+        carPositions[i].y = m_cars[i].y;
+    }
+
+    raceUpdate(m_race, carPositions, m_map, dt);
+
+    int newCheckpoint = m_race.racers[m_playerIndex].currentCheckpoint;
+    if (newCheckpoint != prevCheckpoint && m_race.state == RaceState::Racing) {
+        m_checkpointFlash = 0.3f;
+    }
+    m_lastPlayerCheckpoint = newCheckpoint;
+
+    if (m_checkpointFlash > 0.0f)
+        m_checkpointFlash -= dt;
+
+    updateTrails(dt);
 
     m_camera.zoom = 2.0f;
-    m_camera.update(m_car.x, m_car.y, dt);
+    m_camera.update(m_cars[m_playerIndex].x, m_cars[m_playerIndex].y, dt);
 }
 
 void GameApp::render(SDL_Renderer* renderer) {
@@ -248,8 +354,24 @@ void GameApp::render(SDL_Renderer* renderer) {
         renderMenu(renderer);
     } else {
         renderTiles(renderer);
-        renderCar(renderer);
+        renderTrails(renderer);
+        renderCars(renderer);
         renderHUD(renderer);
+
+        if (m_race.state == RaceState::Finished) {
+            renderFinishScreen(renderer);
+        }
+
+        if (m_checkpointFlash > 0.0f) {
+            int sw, sh;
+            SDL_GetRendererOutputSize(renderer, &sw, &sh);
+            Uint8 alpha = static_cast<Uint8>(m_checkpointFlash / 0.3f * 60);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, 255, 200, 0, alpha);
+            SDL_Rect full = {0, 0, sw, sh};
+            SDL_RenderFillRect(renderer, &full);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+        }
     }
 
     ImGui::Render();
@@ -380,23 +502,55 @@ void GameApp::renderTiles(SDL_Renderer* r) {
     }
 }
 
-void GameApp::renderCar(SDL_Renderer* r) {
+void GameApp::renderTrails(SDL_Renderer* r) {
     int sw, sh;
     SDL_GetRendererOutputSize(r, &sw, &sh);
 
-    SDL_Point sp = m_camera.worldToScreen(m_car.x, m_car.y);
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+
+    for (int i = 0; i < static_cast<int>(m_cars.size()); ++i) {
+        auto& vis = m_carVisuals[i];
+        for (auto& tp : vis.trails) {
+            SDL_Point sp = m_camera.worldToScreen(tp.x, tp.y);
+            sp.x += sw / 2;
+            sp.y += sh / 2;
+            Uint8 alpha = static_cast<Uint8>((1.0f - tp.age / 2.0f) * 100);
+            SDL_SetRenderDrawColor(r, vis.r, vis.g, vis.b, alpha);
+            int size = 3;
+            SDL_Rect dst = {sp.x - size, sp.y - size, size * 2, size * 2};
+            SDL_RenderFillRect(r, &dst);
+        }
+    }
+
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
+}
+
+void GameApp::renderCars(SDL_Renderer* r) {
+    for (int i = 0; i < static_cast<int>(m_cars.size()); ++i) {
+        renderCar(r, i);
+    }
+}
+
+void GameApp::renderCar(SDL_Renderer* r, int idx) {
+    int sw, sh;
+    SDL_GetRendererOutputSize(r, &sw, &sh);
+
+    auto& car = m_cars[idx];
+    auto& vis = m_carVisuals[idx];
+
+    SDL_Point sp = m_camera.worldToScreen(car.x, car.y);
     sp.x += sw / 2;
     sp.y += sh / 2;
 
     float carR = m_carCfg.radius * m_camera.zoom;
-    float cosH = std::cos(m_car.heading);
-    float sinH = std::sin(m_car.heading);
+    float cosH = std::cos(car.heading);
+    float sinH = std::sin(car.heading);
 
     auto rotate = [&](float lx, float ly) -> SDL_Vertex {
         SDL_Vertex v;
         v.position.x = sp.x + (lx * cosH - ly * sinH);
         v.position.y = sp.y + (lx * sinH + ly * cosH);
-        v.color = {51, 153, 255, 255};
+        v.color = {vis.r, vis.g, vis.b, 255};
         v.tex_coord = {0, 0};
         return v;
     };
@@ -427,22 +581,38 @@ void GameApp::renderHUD(SDL_Renderer* renderer) {
     if (m_race.state == RaceState::Countdown) {
         ImGui::Text("Starting in: %.0f", std::ceil(m_race.countdown));
     } else if (m_race.state == RaceState::Racing) {
-        ImGui::Text("Lap: %d / %d", m_race.currentLap + 1, m_race.totalLaps);
-        ImGui::Text("Checkpoint: %d / %d", m_race.currentCheckpoint,
+        auto& playerRacer = m_race.racers[m_playerIndex];
+        int pos = raceGetPosition(m_race, m_playerIndex);
+        const char* posStr = "th";
+        if (pos == 1) posStr = "st";
+        else if (pos == 2) posStr = "nd";
+        else if (pos == 3) posStr = "rd";
+
+        ImGui::Text("Position: %d%s / %d", pos, posStr, static_cast<int>(m_cars.size()));
+        ImGui::Text("Lap: %d / %d", playerRacer.currentLap + 1, m_race.totalLaps);
+        ImGui::Text("Checkpoint: %d / %d", playerRacer.currentCheckpoint,
                     static_cast<int>(m_map.checkpoints().size()));
         ImGui::Text("Time: %.2f", m_race.raceTime);
-        if (m_race.bestLap < 1e6f)
-            ImGui::Text("Best Lap: %.2f", m_race.bestLap);
-        ImGui::Text("Speed: %.0f", m_car.speed);
-    } else if (m_race.state == RaceState::Finished) {
-        ImGui::Text("FINISHED!");
-        ImGui::Text("Total: %.2f", m_race.raceTime);
-        if (m_race.bestLap < 1e6f)
-            ImGui::Text("Best Lap: %.2f", m_race.bestLap);
+        if (playerRacer.bestLap < 1e6f)
+            ImGui::Text("Best Lap: %.2f", playerRacer.bestLap);
+        ImGui::Text("Speed: %.0f", m_cars[m_playerIndex].speed);
+
+        ImGui::Separator();
+        for (int i = 0; i < static_cast<int>(m_cars.size()); ++i) {
+            auto& r = m_race.racers[i];
+            auto& vis = m_carVisuals[i];
+            ImVec4 col(vis.r / 255.0f, vis.g / 255.0f, vis.b / 255.0f, 1.0f);
+            if (r.finished) {
+                ImGui::TextColored(col, "%s: FINISHED (%.2f)", i == 0 ? "You" : "Bot", r.finishTime);
+            } else {
+                ImGui::TextColored(col, "%s: Lap %d, CP %d", i == 0 ? "You" : "Bot",
+                                   r.currentLap + 1, r.currentCheckpoint);
+            }
+        }
     }
 
     ImGui::Separator();
-    ImGui::Text("R = Reset | ESC = Menu | Arrows/WASD = Drive");
+    ImGui::Text("R = Reset | ESC = Menu | WASD/Arrows = Drive");
 
     ImGui::End();
 
@@ -462,6 +632,58 @@ void GameApp::renderHUD(SDL_Renderer* renderer) {
         ImGui::End();
         ImGui::PopStyleVar();
     }
+}
+
+void GameApp::renderFinishScreen(SDL_Renderer* renderer) {
+    int sw, sh;
+    SDL_GetRendererOutputSize(renderer, &sw, &sh);
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 150);
+    SDL_Rect full = {0, 0, sw, sh};
+    SDL_RenderFillRect(renderer, &full);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+
+    ImGui::SetNextWindowPos(ImVec2(sw / 2.0f, sh / 2.0f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(350, 0), ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.9f);
+    ImGui::Begin("##finish", nullptr,
+        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav);
+
+    ImGui::SetWindowFontScale(2.0f);
+    ImGui::TextColored(ImVec4(1, 1, 0, 1), "RACE COMPLETE");
+    ImGui::SetWindowFontScale(1.0f);
+    ImGui::Separator();
+
+    int playerPos = raceGetPosition(m_race, m_playerIndex);
+    const char* posStr = "th";
+    if (playerPos == 1) posStr = "st";
+    else if (playerPos == 2) posStr = "nd";
+    else if (playerPos == 3) posStr = "rd";
+
+    ImGui::Text("You finished: %d%s", playerPos, posStr);
+    ImGui::Text("Total time: %.2f", m_race.racers[m_playerIndex].finishTime);
+    if (m_race.racers[m_playerIndex].bestLap < 1e6f)
+        ImGui::Text("Best lap: %.2f", m_race.racers[m_playerIndex].bestLap);
+    ImGui::Separator();
+
+    for (int i = 0; i < static_cast<int>(m_cars.size()); ++i) {
+        auto& r = m_race.racers[i];
+        auto& vis = m_carVisuals[i];
+        ImVec4 col(vis.r / 255.0f, vis.g / 255.0f, vis.b / 255.0f, 1.0f);
+        ImGui::TextColored(col, "%d. %s - %.2f", i + 1, i == 0 ? "You" : "Bot", r.finishTime);
+    }
+
+    ImGui::Separator();
+    if (ImGui::Button("Back to Menu", ImVec2(330, 30)))
+        m_state = AppState::Menu;
+    if (ImGui::Button("Race Again", ImVec2(330, 30))) {
+        resetAllCars();
+        raceInit(m_race, m_map, static_cast<int>(m_cars.size()));
+    }
+
+    ImGui::End();
 }
 
 } // namespace mm

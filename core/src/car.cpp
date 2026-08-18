@@ -77,6 +77,15 @@ void carUpdate(CarState& car, const PlayerInput& input, const CarConfig& cfg,
 
     car.speed = std::sqrt(car.vx * car.vx + car.vy * car.vy);
     car.forwardSpeed = car.vx * cosH + car.vy * sinH;
+
+    float mapW = map.width() * map.tileSize();
+    float mapH = map.height() * map.tileSize();
+    float r = cfg.radius;
+
+    if (car.x - r < 0)    { car.x = r;        car.vx = std::max(0.0f, car.vx); }
+    if (car.x + r > mapW) { car.x = mapW - r;  car.vx = std::min(0.0f, car.vx); }
+    if (car.y - r < 0)    { car.y = r;        car.vy = std::max(0.0f, car.vy); }
+    if (car.y + r > mapH) { car.y = mapH - r;  car.vy = std::min(0.0f, car.vy); }
 }
 
 } // namespace mm

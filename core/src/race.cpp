@@ -29,9 +29,10 @@ static std::vector<std::pair<int,int>> checkpointTiles(int x1, int y1, int x2, i
     return tiles;
 }
 
-void raceInit(RaceData& race, const MapData& map) {
+void raceInit(RaceData& race, const MapData& map, int numRacers) {
     race = RaceData();
     race.totalLaps = map.laps();
+    race.racers.resize(numRacers);
     if (map.checkpoints().empty()) {
         race.state = RaceState::Racing;
     } else {
@@ -40,11 +41,30 @@ void raceInit(RaceData& race, const MapData& map) {
     }
 }
 
-void raceUpdate(RaceData& race, float carX, float carY, const MapData& map, float dt,
-                float prevX, float prevY) {
-    (void)prevX;
-    (void)prevY;
+static int racerProgress(const RacerState& r, int numCheckpoints) {
+    return r.currentLap * numCheckpoints + r.currentCheckpoint;
+}
 
+static void updatePositions(RaceData& race, const MapData& map) {
+    int numCheckpoints = static_cast<int>(map.checkpoints().size());
+    if (numCheckpoints == 0) return;
+
+    std::vector<std::pair<int,int>> indexed;
+    for (int i = 0; i < static_cast<int>(race.racers.size()); ++i) {
+        int prog = racerProgress(race.racers[i], numCheckpoints);
+        indexed.push_back({prog, i});
+    }
+
+    std::sort(indexed.begin(), indexed.end(), [](auto& a, auto& b) {
+        return a.first > b.first;
+    });
+
+    for (int pos = 0; pos < static_cast<int>(indexed.size()); ++pos) {
+        race.racers[indexed[pos].second].position = pos + 1;
+    }
+}
+
+void raceUpdate(RaceData& race, const std::vector<CarPosition>& cars, const MapData& map, float dt) {
     if (race.state == RaceState::Countdown) {
         race.countdown -= dt;
         if (race.countdown <= 0.0f) {
@@ -57,38 +77,60 @@ void raceUpdate(RaceData& race, float carX, float carY, const MapData& map, floa
     if (race.state == RaceState::Finished) return;
 
     race.raceTime += dt;
-    race.currentLapTime += dt;
 
     auto& cps = map.checkpoints();
     if (cps.empty()) return;
 
     int ts = map.tileSize();
-    int carTileX = static_cast<int>(std::floor(carX / ts));
-    int carTileY = static_cast<int>(std::floor(carY / ts));
 
-    int next = race.currentCheckpoint;
-    auto& cp = cps[next];
+    for (int i = 0; i < static_cast<int>(cars.size()); ++i) {
+        if (i >= static_cast<int>(race.racers.size())) break;
+        auto& racer = race.racers[i];
+        if (racer.finished) continue;
 
-    auto tiles = checkpointTiles(cp.x1, cp.y1, cp.x2, cp.y2);
+        racer.currentLapTime += dt;
 
-    for (auto& t : tiles) {
-        if (t.first == carTileX && t.second == carTileY) {
-            race.currentCheckpoint++;
+        int carTileX = static_cast<int>(std::floor(cars[i].x / ts));
+        int carTileY = static_cast<int>(std::floor(cars[i].y / ts));
 
-            if (race.currentCheckpoint >= static_cast<int>(cps.size())) {
-                race.currentCheckpoint = 0;
-                race.currentLap++;
+        int next = racer.currentCheckpoint;
+        auto& cp = cps[next];
 
-                if (race.currentLapTime < race.bestLap)
-                    race.bestLap = race.currentLapTime;
-                race.currentLapTime = 0.0f;
+        auto tiles = checkpointTiles(cp.x1, cp.y1, cp.x2, cp.y2);
 
-                if (race.currentLap >= race.totalLaps)
-                    race.state = RaceState::Finished;
+        for (auto& t : tiles) {
+            if (t.first == carTileX && t.second == carTileY) {
+                racer.currentCheckpoint++;
+
+                if (racer.currentCheckpoint >= static_cast<int>(cps.size())) {
+                    racer.currentCheckpoint = 0;
+                    racer.currentLap++;
+
+                    if (racer.currentLapTime < racer.bestLap)
+                        racer.bestLap = racer.currentLapTime;
+                    racer.currentLapTime = 0.0f;
+
+                    if (racer.currentLap >= race.totalLaps) {
+                        racer.finished = true;
+                        racer.finishTime = race.raceTime;
+                        race.finishedCount++;
+
+                        if (race.finishedCount >= static_cast<int>(race.racers.size()))
+                            race.state = RaceState::Finished;
+                    }
+                }
+                break;
             }
-            break;
         }
     }
+
+    updatePositions(race, map);
+}
+
+int raceGetPosition(const RaceData& race, int racerIdx) {
+    if (racerIdx >= 0 && racerIdx < static_cast<int>(race.racers.size()))
+        return race.racers[racerIdx].position;
+    return 0;
 }
 
 } // namespace mm
