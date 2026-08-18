@@ -7,9 +7,13 @@
 #include "camera.h"
 #include "input.h"
 #include "network_client.h"
+#include "ui/ui_context.h"
+#include "ui/menu_screen.h"
+#include "ui/server_screen.h"
 #include <SDL.h>
 #include <string>
 #include <vector>
+#include <memory>
 
 namespace mm {
 
@@ -53,9 +57,8 @@ private:
     void resetAllCars();
     void spawnBots();
     void updateTrails(float dt);
+    void enterMenu();
 
-    void renderMenu(SDL_Renderer* renderer);
-    void renderServerBrowser(SDL_Renderer* renderer);
     void renderTiles(SDL_Renderer* r);
     void renderTrails(SDL_Renderer* r);
     void renderCars(SDL_Renderer* r);
@@ -78,6 +81,10 @@ private:
     InputSystem m_input;
     SDL_Renderer* m_renderer = nullptr;
 
+    UIContext m_ui;
+    std::unique_ptr<MenuScreen> m_menuScreen;
+    std::unique_ptr<ServerScreen> m_serverScreen;
+
     std::vector<CarState> m_cars;
     std::vector<BotConfig> m_botConfigs;
     std::vector<BotState> m_botStates;
@@ -85,23 +92,15 @@ private:
     int m_playerIndex = 0;
 
     std::vector<MapEntry> m_maps;
-    int m_selectedMap = 0;
     std::string m_mapDir;
 
     float m_checkpointFlash = 0.0f;
     int m_lastPlayerCheckpoint = 0;
 
     NetworkClient m_net;
-    std::vector<ServerBrowserEntry> m_serverList;
     std::string m_masterUrl;
-    char m_directIp[64] = "127.0.0.1";
-    char m_directPort[8] = "27015";
     bool m_netInitialized = false;
-    std::string m_connectStatus;
     bool m_mpMapLoaded = false;
-    int m_selectedServer = -1;
-    MapData m_previewMap;
-    bool m_hasPreview = false;
 };
 
 } // namespace mm

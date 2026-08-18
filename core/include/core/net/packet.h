@@ -11,7 +11,7 @@ constexpr int DEFAULT_PORT = 27015;
 constexpr int MAX_PLAYERS = 8;
 constexpr int CHANNEL_RELIABLE = 0;
 constexpr int CHANNEL_UNRELIABLE = 1;
-constexpr const char* DEFAULT_MASTER = "http://localhost:8080";
+constexpr const char* DEFAULT_MASTER = "http://192.168.1.240:8080";
 
 enum class PacketType : uint8_t {
     // Reliable (channel 0)

@@ -1,6 +1,8 @@
 #include "game_app.h"
 #include "core/map_serializer.h"
 #include "core/collision.h"
+#include "ui/menu_screen.h"
+#include "ui/server_screen.h"
 #include "imgui.h"
 #include "imgui_impl_sdlrenderer2.h"
 #include <SDL.h>
@@ -431,6 +433,11 @@ bool GameApp::init(SDL_Renderer* renderer, const char* mapPath) {
     m_renderer = renderer;
     m_input.init();
 
+    if (!m_ui.init(renderer)) {
+        fprintf(stderr, "UIContext init failed\n");
+        return false;
+    }
+
     if (enet_initialize() == 0) {
         m_net.init();
         m_net.setOnMapReceived([this](const std::string& data) { onMapReceived(data); });
@@ -442,6 +449,29 @@ bool GameApp::init(SDL_Renderer* renderer, const char* mapPath) {
     m_mapDir = getExeDir();
     scanMaps();
 
+    m_menuScreen = std::make_unique<MenuScreen>();
+    m_menuScreen->setMaps(m_maps);
+    m_menuScreen->setCallbacks(
+        [this](const std::string& p) { loadMap(p); },
+        [this]() { loadFallback(); },
+        [this]() { loadRandomMap(); },
+        [this]() { m_state = AppState::MultiplayerLobby; },
+        [this]() { m_quit = true; }
+    );
+
+    m_serverScreen = std::make_unique<ServerScreen>();
+    m_serverScreen->setCallbacks(
+        [this](const std::string& ip, int port) {
+            if (ip == "__refresh__") {
+                m_serverScreen->refreshServers(m_net);
+            } else {
+                connectToServer(ip, port);
+            }
+        },
+        [this]() { enterMenu(); }
+    );
+    m_serverScreen->setMasterUrl(m_masterUrl);
+
     if (mapPath) {
         loadMap(mapPath);
     } else {
@@ -452,6 +482,9 @@ bool GameApp::init(SDL_Renderer* renderer, const char* mapPath) {
 }
 
 void GameApp::shutdown() {
+    m_menuScreen.reset();
+    m_serverScreen.reset();
+    m_ui.shutdown();
     m_net.shutdown();
     if (m_netInitialized) enet_deinitialize();
     m_input.shutdown();
@@ -463,6 +496,16 @@ void GameApp::handleEvent(const SDL_Event& e) {
         return;
     }
 
+    if (m_state == AppState::Menu) {
+        if (m_menuScreen) m_menuScreen->handleEvent(e);
+        return;
+    }
+
+    if (m_state == AppState::MultiplayerLobby) {
+        if (m_serverScreen) m_serverScreen->handleEvent(e);
+        return;
+    }
+
     m_input.handleEvent(e);
 
     if (m_state == AppState::Playing && e.type == SDL_KEYDOWN) {
@@ -471,20 +514,15 @@ void GameApp::handleEvent(const SDL_Event& e) {
             raceInit(m_race, m_map, static_cast<int>(m_cars.size()));
         }
         if (e.key.keysym.sym == SDLK_ESCAPE)
-            m_state = AppState::Menu;
+            enterMenu();
     }
 
     if (m_state == AppState::MultiplayerPlaying && e.type == SDL_KEYDOWN) {
         if (e.key.keysym.sym == SDLK_ESCAPE) {
             m_net.disconnect();
             m_mpMapLoaded = false;
-            m_state = AppState::Menu;
+            enterMenu();
         }
-    }
-
-    if (m_state == AppState::MultiplayerLobby && e.type == SDL_KEYDOWN) {
-        if (e.key.keysym.sym == SDLK_ESCAPE)
-            m_state = AppState::Menu;
     }
 }
 
@@ -609,22 +647,18 @@ void GameApp::render(SDL_Renderer* renderer) {
     SDL_SetRenderDrawColor(renderer, 30, 30, 35, 255);
     SDL_RenderClear(renderer);
 
-    ImGui::NewFrame();
+    m_ui.beginFrame();
 
     if (m_state == AppState::Menu) {
-        renderMenu(renderer);
+        if (m_menuScreen) m_menuScreen->render(m_ui);
     } else if (m_state == AppState::MultiplayerLobby) {
-        renderServerBrowser(renderer);
+        if (m_serverScreen) m_serverScreen->render(m_ui);
     } else {
         renderTiles(renderer);
         renderTrails(renderer);
         renderCars(renderer);
-        renderHUD(renderer);
-        renderMinimap(renderer);
 
-        if (m_race.state == RaceState::Finished) {
-            renderFinishScreen(renderer);
-        }
+        renderMinimap(renderer);
 
         if (m_checkpointFlash > 0.0f) {
             int sw, sh;
@@ -636,91 +670,29 @@ void GameApp::render(SDL_Renderer* renderer) {
             SDL_RenderFillRect(renderer, &full);
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
         }
+
+        ImGui::NewFrame();
+        renderHUD(renderer);
+        if (m_race.state == RaceState::Finished)
+            renderFinishScreen(renderer);
+        ImGui::Render();
+        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
     }
 
-    ImGui::Render();
-    ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
     SDL_RenderPresent(renderer);
 }
 
-void GameApp::renderMenu(SDL_Renderer* renderer) {
-    int sw, sh;
-    SDL_GetRendererOutputSize(renderer, &sw, &sh);
-
-    float menuW = 500.0f;
-    ImGui::SetNextWindowPos(ImVec2(sw / 2.0f, sh / 2.0f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(menuW, 0), ImGuiCond_Always);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12, 12));
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 8));
-    ImGui::Begin("##menu", nullptr,
-        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings);
-
-    ImGui::SetWindowFontScale(2.5f);
-    float titleW = ImGui::CalcTextSize("MiniMachines").x;
-    ImGui::SetCursorPosX((menuW - titleW) / 2.0f);
-    ImGui::Text("MiniMachines");
-    ImGui::SetWindowFontScale(1.0f);
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    ImGui::Text("Select a map:");
-    ImGui::Spacing();
-
-    ImGui::BeginChild("map_list", ImVec2(0, 200), true);
-    for (int i = 0; i < static_cast<int>(m_maps.size()); ++i) {
-        bool selected = (i == m_selectedMap);
-        if (ImGui::Selectable(m_maps[i].name.c_str(), selected,
-                              ImGuiSelectableFlags_AllowDoubleClick, ImVec2(0, 30))) {
-            m_selectedMap = i;
-            if (ImGui::IsMouseDoubleClicked(0))
-                loadMap(m_maps[m_selectedMap].path);
-        }
-        if (selected) ImGui::SetItemDefaultFocus();
+void GameApp::enterMenu() {
+    m_state = AppState::Menu;
+    if (m_menuScreen) {
+        m_menuScreen->setMaps(m_maps);
     }
-    ImGui::EndChild();
-
-    ImGui::Spacing();
-
-    if (!m_maps.empty()) {
-        if (ImGui::Button("Play", ImVec2(-1, 50)))
-            loadMap(m_maps[m_selectedMap].path);
-        ImGui::Spacing();
-    }
-
-    if (ImGui::Button("Fallback Track", ImVec2(-1, 50)))
-        loadFallback();
-    ImGui::Spacing();
-
-    if (ImGui::Button("Random Track", ImVec2(-1, 50)))
-        loadRandomMap();
-    ImGui::Spacing();
-
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    if (ImGui::Button("Multiplayer", ImVec2(-1, 50)))
-        m_state = AppState::MultiplayerLobby;
-    ImGui::Spacing();
-
-    if (ImGui::Button("Quit", ImVec2(-1, 40)))
-        m_quit = true;
-
-    ImGui::Separator();
-    ImGui::Text("D-Pad: Navigate | A: Select | B: Back");
-
-    ImGui::End();
-    ImGui::PopStyleVar(2);
 }
 
 void GameApp::connectToServer(const std::string& ip, int port) {
-    m_connectStatus = "Connecting...";
     if (m_net.connect(ip, port)) {
         m_state = AppState::MultiplayerPlaying;
         m_mpMapLoaded = false;
-        m_connectStatus = "Connected!";
-    } else {
-        m_connectStatus = "Connection failed.";
     }
 }
 
@@ -769,137 +741,6 @@ void GameApp::onStateReceived() {
     if (m_mpMapLoaded && m_playerIndex < static_cast<int>(m_cars.size())) {
         m_camera.update(m_cars[m_playerIndex].x, m_cars[m_playerIndex].y, 1.0f / 30.0f);
     }
-}
-
-void GameApp::renderServerBrowser(SDL_Renderer* renderer) {
-    int sw, sh;
-    SDL_GetRendererOutputSize(renderer, &sw, &sh);
-
-    ImGui::SetNextWindowPos(ImVec2(sw / 2.0f, sh / 2.0f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(700, 600), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Multiplayer", nullptr, ImGuiWindowFlags_NoCollapse);
-
-    ImGui::Text("Server Browser");
-    ImGui::Separator();
-
-    ImGui::InputText("Master Server", (char*)m_masterUrl.c_str(), m_masterUrl.size() + 1,
-                     ImGuiInputTextFlags_ReadOnly);
-    ImGui::SameLine();
-    if (ImGui::Button("Refresh")) {
-        m_serverList = m_net.queryMaster(m_masterUrl);
-        m_selectedServer = -1;
-        m_hasPreview = false;
-    }
-
-    ImGui::Separator();
-    ImGui::Text("Servers:");
-
-    ImGui::BeginChild("server_browser_area", ImVec2(0, -80), false);
-
-    ImGui::BeginChild("server_list", ImVec2(300, 0), true);
-    for (int i = 0; i < static_cast<int>(m_serverList.size()); ++i) {
-        auto& s = m_serverList[i];
-        char label[256];
-        snprintf(label, sizeof(label), "%s:%d\n%s\n%d/%d players",
-                 s.ip.c_str(), s.port, s.mapName.c_str(), s.players, s.maxPlayers);
-        bool selected = (i == m_selectedServer);
-        if (ImGui::Selectable(label, selected)) {
-            m_selectedServer = i;
-            snprintf(m_directIp, sizeof(m_directIp), "%s", s.ip.c_str());
-            snprintf(m_directPort, sizeof(m_directPort), "%d", s.port);
-
-            if (!s.mapData.empty()) {
-                std::string tmpPath = getExeDir() + "\\_preview_map.json";
-                FILE* f = fopen(tmpPath.c_str(), "wb");
-                if (f) {
-                    fwrite(s.mapData.data(), 1, s.mapData.size(), f);
-                    fclose(f);
-                    if (MapSerializer::loadFromFile(m_previewMap, tmpPath))
-                        m_hasPreview = true;
-                    else
-                        m_hasPreview = false;
-                    remove(tmpPath.c_str());
-                }
-            } else {
-                m_hasPreview = false;
-            }
-        }
-    }
-    ImGui::EndChild();
-
-    ImGui::SameLine();
-
-    ImGui::BeginChild("map_preview", ImVec2(0, 0), true);
-    if (m_hasPreview) {
-        ImGui::Text("Map Preview: %s", m_previewMap.name().c_str());
-        ImGui::Text("Size: %dx%d", m_previewMap.width(), m_previewMap.height());
-
-        ImVec2 avail = ImGui::GetContentRegionAvail();
-        int previewSize = static_cast<int>(std::min(avail.x, avail.y));
-        if (previewSize < 50) previewSize = 50;
-
-        int mapW = m_previewMap.width();
-        int mapH = m_previewMap.height();
-        float scale = (float)previewSize / std::max(mapW, mapH);
-        int drawW = (int)(mapW * scale);
-        int drawH = (int)(mapH * scale);
-
-        ImDrawList* drawList = ImGui::GetWindowDrawList();
-        ImVec2 cursor = ImGui::GetCursorScreenPos();
-
-        drawList->AddRectFilled(cursor, ImVec2(cursor.x + drawW, cursor.y + drawH),
-                                IM_COL32(0, 0, 0, 255));
-
-        int step = std::max(1, mapW / drawW);
-        for (int ty = 0; ty < mapH; ty += step) {
-            for (int tx = 0; tx < mapW; tx += step) {
-                TileType ground = m_previewMap.getGround(tx, ty);
-                TileType obj = m_previewMap.getObject(tx, ty);
-                TileType display = (obj != TileType::Empty) ? obj : ground;
-                const TileInfo* info = findTileInfo(display);
-                if (!info) continue;
-
-                int px = (int)(tx * scale);
-                int py = (int)(ty * scale);
-                int ps = std::max(1, (int)(step * scale));
-
-                ImU32 col = IM_COL32(info->r, info->g, info->b, 255);
-                drawList->AddRectFilled(
-                    ImVec2(cursor.x + px, cursor.y + py),
-                    ImVec2(cursor.x + px + ps, cursor.y + py + ps),
-                    col);
-            }
-        }
-
-        ImGui::Dummy(ImVec2(drawW, drawH));
-    } else {
-        ImGui::Text("Select a server to preview its map");
-    }
-    ImGui::EndChild();
-
-    ImGui::EndChild();
-
-    ImGui::Separator();
-    ImGui::PushItemWidth(200);
-    ImGui::InputText("IP", m_directIp, sizeof(m_directIp));
-    ImGui::SameLine();
-    ImGui::PushItemWidth(80);
-    ImGui::InputText("Port", m_directPort, sizeof(m_directPort));
-    ImGui::PopItemWidth();
-    ImGui::SameLine();
-    if (ImGui::Button("Connect")) {
-        connectToServer(m_directIp, atoi(m_directPort));
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Back"))
-        m_state = AppState::Menu;
-    ImGui::PopItemWidth();
-
-    if (!m_connectStatus.empty()) {
-        ImGui::Text("%s", m_connectStatus.c_str());
-    }
-
-    ImGui::End();
 }
 
 void GameApp::renderTiles(SDL_Renderer* r) {
