@@ -1,3 +1,0 @@
-C:/Users/SarahRose/PycharmProjects/minimachines/android/app/.cxx/Debug/f2a19163/arm64-v8a/_deps/sdl2_image-subbuild/CMakeFiles/sdl2_image-populate.dir
-C:/Users/SarahRose/PycharmProjects/minimachines/android/app/.cxx/Debug/f2a19163/arm64-v8a/_deps/sdl2_image-subbuild/CMakeFiles/edit_cache.dir
-C:/Users/SarahRose/PycharmProjects/minimachines/android/app/.cxx/Debug/f2a19163/arm64-v8a/_deps/sdl2_image-subbuild/CMakeFiles/rebuild_cache.dir
