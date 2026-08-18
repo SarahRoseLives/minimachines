@@ -37,6 +37,23 @@ void Palette::draw(ToolState& state) {
     }
 
     ImGui::Spacing();
+    ImGui::Text("Brush");
+    ImGui::Separator();
+    ImGui::SliderInt("Size", &state.brushSize, 1, 8);
+    ImGui::Text("(Shift+drag: rectangle fill)");
+
+    if (state.selectedTile == TileType::Road) {
+        ImGui::Spacing();
+        bool wasActive = state.roadWallPreset;
+        ImGui::Checkbox("Road + Walls", &state.roadWallPreset);
+        if (state.roadWallPreset && !wasActive) state.brushSize = 4;
+        if (state.roadWallPreset)
+            ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Paints road center\n+ wall edges");
+    } else {
+        state.roadWallPreset = false;
+    }
+
+    ImGui::Spacing();
     ImGui::Text("Tools");
     ImGui::Separator();
 

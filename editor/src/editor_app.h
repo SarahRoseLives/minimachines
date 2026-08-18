@@ -36,6 +36,7 @@ private:
     void endMapWindow();
     void drawMenuBar();
     void drawCheckpointIndices(ImVec2 canvasPos);
+    void drawMinimap(ImVec2 canvasPos, ImVec2 canvasSize);
     void doSave();
     void doLoad();
     void doNewMap(int w, int h, int tileSize);
@@ -57,9 +58,10 @@ private:
     bool m_quit = false;
     bool m_showPalette = true;
     bool m_showProperties = true;
-    bool m_showNewMapDialog = false;
     bool m_gridEnabled = true;
     bool m_mapFocused = false;
+    int m_hoverTileX = -1;
+    int m_hoverTileY = -1;
     std::string m_currentFile;
     std::string m_statusMsg;
     float m_statusTimer = 0.0f;

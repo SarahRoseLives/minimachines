@@ -1,13 +1,13 @@
 #include "properties.h"
 #include "imgui.h"
-#include "core/map_serializer.h"
 
 namespace mm {
 
-void Properties::draw(MapData& map, bool& showNewMapDialog) {
+bool Properties::draw(MapData& map) {
+    bool newMapRequested = false;
     if (!ImGui::Begin("Properties")) {
         ImGui::End();
-        return;
+        return false;
     }
 
     char nameBuf[128];
@@ -38,8 +38,10 @@ void Properties::draw(MapData& map, bool& showNewMapDialog) {
     ImGui::Text("Spawns: %d", (int)map.spawns().size());
     ImGui::Text("Checkpoints: %d", (int)map.checkpoints().size());
 
-    if (ImGui::Button("New Map"))
-        showNewMapDialog = true;
+    if (ImGui::Button("New Map")) {
+        map = MapData(32, 32, 32);
+        newMapRequested = true;
+    }
 
     if (ImGui::Button("Clear Spawns"))
         map.spawns().clear();
@@ -47,31 +49,7 @@ void Properties::draw(MapData& map, bool& showNewMapDialog) {
         map.checkpoints().clear();
 
     ImGui::End();
-}
-
-void Properties::drawNewMapDialog(MapData& map, bool& open) {
-    if (!open) return;
-
-    ImGui::SetNextWindowSize(ImVec2(300, 200), ImGuiCond_FirstUseEver);
-    if (ImGui::Begin("New Map", &open)) {
-        static int nw = 32, nh = 32, nts = 32;
-        ImGui::InputInt("Width", &nw);
-        ImGui::InputInt("Height", &nh);
-        ImGui::InputInt("Tile Size", &nts);
-
-        if (nw < 1) nw = 1;
-        if (nh < 1) nh = 1;
-        if (nts < 1) nts = 1;
-
-        if (ImGui::Button("Create")) {
-            map = MapData(nw, nh, nts);
-            open = false;
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel"))
-            open = false;
-    }
-    ImGui::End();
+    return newMapRequested;
 }
 
 } // namespace mm

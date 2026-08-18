@@ -8,8 +8,7 @@ namespace mm {
 
 class Properties {
 public:
-    void draw(MapData& map, bool& showNewMapDialog);
-    void drawNewMapDialog(MapData& map, bool& open);
+    bool draw(MapData& map);
 };
 
 } // namespace mm

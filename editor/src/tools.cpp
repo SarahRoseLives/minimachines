@@ -4,37 +4,74 @@
 
 namespace mm {
 
+static void paintTile(MapData& map, ToolState& state, int tx, int ty) {
+    if (!map.inBounds(tx, ty)) return;
+
+    if (state.roadWallPreset && state.selectedTile == TileType::Road) {
+        int half = state.brushSize / 2;
+        for (int dx = -half - 1; dx <= half + 1; ++dx) {
+            if (!map.inBounds(tx + dx, ty)) continue;
+            if (dx < -half || dx > half)
+                map.setObject(tx + dx, ty, TileType::Wall);
+            else
+                map.setGround(tx + dx, ty, TileType::Road);
+        }
+        return;
+    }
+
+    if (state.currentTool == ToolType::Erase) {
+        if (state.activeLayer == Layer::Ground)
+            map.setGround(tx, ty, TileType::Grass);
+        else
+            map.setObject(tx, ty, TileType::Empty);
+    } else {
+        if (state.activeLayer == Layer::Ground)
+            map.setGround(tx, ty, state.selectedTile);
+        else
+            map.setObject(tx, ty, state.selectedTile);
+    }
+}
+
 static void applyTool(const Camera& cam, MapData& map, ToolState& state, int mx, int my) {
     SDL_Point tile = cam.screenToWorld(mx, my, map.tileSize());
     if (!map.inBounds(tile.x, tile.y)) return;
 
-    switch (state.currentTool) {
-    case ToolType::Paint:
-        if (state.activeLayer == Layer::Ground)
-            map.setGround(tile.x, tile.y, state.selectedTile);
-        else
-            map.setObject(tile.x, tile.y, state.selectedTile);
-        break;
-    case ToolType::Erase:
-        if (state.activeLayer == Layer::Ground)
-            map.setGround(tile.x, tile.y, TileType::Grass);
-        else
-            map.setObject(tile.x, tile.y, TileType::Empty);
-        break;
-    case ToolType::StampSpawn:
-    case ToolType::StampCheckpoint:
-    case ToolType::DeleteEntity:
-        break;
+    int half = state.brushSize / 2;
+    for (int dy = -half; dy < state.brushSize - half; ++dy) {
+        for (int dx = -half; dx < state.brushSize - half; ++dx) {
+            paintTile(map, state, tile.x + dx, tile.y + dy);
+        }
     }
 }
 
+void Tools::applyRectFill(MapData& map, ToolState& state, int x1, int y1, int x2, int y2) {
+    int minX = std::min(x1, x2);
+    int maxX = std::max(x1, x2);
+    int minY = std::min(y1, y2);
+    int maxY = std::max(y1, y2);
+
+    for (int y = minY; y <= maxY; ++y)
+        for (int x = minX; x <= maxX; ++x)
+            paintTile(map, state, x, y);
+}
+
 void Tools::onMouseButton(const Camera& cam, MapData& map, ToolState& state,
-                          int mx, int my, bool down, bool isLeft) {
+                          int mx, int my, bool down, bool isLeft, bool shiftHeld) {
     if (!isLeft) return;
 
     int ts = map.tileSize();
 
     if (down) {
+        if (shiftHeld && (state.currentTool == ToolType::Paint || state.currentTool == ToolType::Erase)) {
+            SDL_Point tile = cam.screenToWorld(mx, my, ts);
+            if (!map.inBounds(tile.x, tile.y)) return;
+            state.rectFilling = true;
+            state.rectStartX = tile.x;
+            state.rectStartY = tile.y;
+            state.rectEndX = tile.x;
+            state.rectEndY = tile.y;
+            return;
+        }
         if (state.currentTool == ToolType::StampSpawn) {
             SDL_Point tile = cam.screenToWorld(mx, my, ts);
             if (!map.inBounds(tile.x, tile.y)) return;
@@ -100,6 +137,16 @@ void Tools::onMouseButton(const Camera& cam, MapData& map, ToolState& state,
         state.painting = true;
         applyTool(cam, map, state, mx, my);
     } else {
+        if (state.rectFilling) {
+            applyRectFill(map, state, state.rectStartX, state.rectStartY, state.rectEndX, state.rectEndY);
+            state.rectFilling = false;
+            state.rectStartX = -1;
+            state.rectStartY = -1;
+            state.rectEndX = -1;
+            state.rectEndY = -1;
+            return;
+        }
+
         if (state.currentTool == ToolType::StampSpawn && state.painting) {
             float centerX = (state.spawnTileX + 0.5f) * ts;
             float centerY = (state.spawnTileY + 0.5f) * ts;
@@ -139,6 +186,13 @@ void Tools::onMouseButton(const Camera& cam, MapData& map, ToolState& state,
 
 void Tools::onMouseMove(const Camera& cam, MapData& map, ToolState& state,
                         int mx, int my) {
+    if (state.rectFilling) {
+        SDL_Point tile = cam.screenToWorld(mx, my, map.tileSize());
+        state.rectEndX = tile.x;
+        state.rectEndY = tile.y;
+        return;
+    }
+
     if (state.currentTool == ToolType::StampSpawn && state.painting) {
         state.aimX = mx;
         state.aimY = my;

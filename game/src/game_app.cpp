@@ -85,6 +85,13 @@ void GameApp::generateFallbackMap() {
     m_map.checkpoints().push_back({3, 3, 38, 3});
 
     m_map.setLaps(3);
+
+    auto& spawns = m_map.spawns();
+    float rightAngle = 0.0f;
+    spawns.push_back({15, 5, rightAngle});
+    spawns.push_back({18, 5, rightAngle});
+    spawns.push_back({21, 5, rightAngle});
+    spawns.push_back({24, 5, rightAngle});
 }
 void GameApp::loadRandomMap() {
     static std::random_device rd;
@@ -92,7 +99,7 @@ void GameApp::loadRandomMap() {
 
     const int W = 1000, H = 1000, TS = 32;
     const int ROAD_HW = 3;
-    const int PAD = 60;
+    const int PAD = 80;
     const float PI = 3.14159265358979f;
 
     m_map = MapData(W, H, TS);
@@ -123,7 +130,7 @@ void GameApp::loadRandomMap() {
             if (j < skipEnds && j > 0) continue;
             if (j >= n - 1 - skipEnds) continue;
             auto& a = wp[j]; auto& b = wp[j+1];
-            if (segDist(ax,ay,bx,by, a.first,a.second,b.first,b.second) < ROAD_HW*2+6)
+            if (segDist(ax,ay,bx,by, a.first,a.second,b.first,b.second) < ROAD_HW*2+4)
                 return true;
         }
         return false;
@@ -148,36 +155,40 @@ void GameApp::loadRandomMap() {
     };
 
     float centerX = W/2.0f, centerY = H/2.0f;
+    bool trackGenerated = false;
 
-    for (int attempt = 0; attempt < 100; ++attempt) {
+    for (int attempt = 0; attempt < 200; ++attempt) {
         std::vector<std::pair<int,int>> wp;
 
         float sa = std::uniform_real_distribution<>(0.0f, 2.0f*PI)(gen);
-        float sd = std::uniform_real_distribution<>(150.0f, 250.0f)(gen);
+        float sd = std::uniform_real_distribution<>(100.0f, 200.0f)(gen);
         wp.push_back({std::clamp((int)(centerX + sd*std::cos(sa)), PAD, W-PAD-1),
                       std::clamp((int)(centerY + sd*std::sin(sa)), PAD, H-PAD-1)});
 
-        float angle = sa + PI + std::uniform_real_distribution<>(-0.5f, 0.5f)(gen);
+        float angle = sa + PI + std::uniform_real_distribution<>(-0.3f, 0.3f)(gen);
 
-        for (int i = 0; i < 30; ++i) {
-            angle += std::uniform_real_distribution<>(-1.2f, 1.2f)(gen);
-            float step = std::uniform_real_distribution<>(30.0f, 70.0f)(gen);
+        int numSegs = std::uniform_int_distribution<>(15, 25)(gen);
+        for (int i = 0; i < numSegs; ++i) {
+            angle += std::uniform_real_distribution<>(-0.8f, 0.8f)(gen);
+            float step = std::uniform_real_distribution<>(40.0f, 80.0f)(gen);
             int nx = std::clamp((int)(wp.back().first + step*std::cos(angle)), PAD, W-PAD-1);
             int ny = std::clamp((int)(wp.back().second + step*std::sin(angle)), PAD, H-PAD-1);
 
-            if (overlaps(wp.back().first, wp.back().second, nx, ny, wp, 0)) {
+            if (overlaps(wp.back().first, wp.back().second, nx, ny, wp, 2)) {
                 angle += PI*0.5f;
                 continue;
             }
             wp.push_back({nx, ny});
         }
 
-        if (wp.size() < 12) continue;
+        if (wp.size() < 10) continue;
 
         auto& last = wp.back();
         auto& first = wp.front();
         float gap = std::sqrt((float)((first.first-last.first)*(first.first-last.first) +
                                       (first.second-last.second)*(first.second-last.second)));
+
+        if (gap > 200.0f) continue;
 
         int closureSteps = std::max(2, (int)(gap / 40.0f));
         bool closureOk = true;
@@ -186,9 +197,9 @@ void GameApp::loadRandomMap() {
         for (int step = 1; step <= closureSteps; ++step) {
             float t = (float)step / closureSteps;
             int mx = (int)(last.first + (first.first - last.first) * t)
-                     + std::uniform_int_distribution<>(-3,3)(gen);
+                     + std::uniform_int_distribution<>(-2,2)(gen);
             int my = (int)(last.second + (first.second - last.second) * t)
-                     + std::uniform_int_distribution<>(-3,3)(gen);
+                     + std::uniform_int_distribution<>(-2,2)(gen);
             mx = std::clamp(mx, PAD, W-PAD-1);
             my = std::clamp(my, PAD, H-PAD-1);
 
@@ -244,10 +255,63 @@ void GameApp::loadRandomMap() {
         }
 
         float spawnAng = std::atan2((float)(wp[1].second-wp[0].second), (float)(wp[1].first-wp[0].first));
-        Spawn sp; sp.x = wp[0].first; sp.y = wp[0].second; sp.angle = spawnAng;
-        m_map.spawns().push_back(sp);
+        for (int i = 0; i < 4; ++i) {
+            Spawn sp;
+            sp.x = wp[i % numWP].first;
+            sp.y = wp[i % numWP].second;
+            sp.angle = spawnAng;
+            m_map.spawns().push_back(sp);
+        }
         m_map.setLaps(3);
+        trackGenerated = true;
         break;
+    }
+
+    if (!trackGenerated) {
+        int cx = W/2, cy = H/2, rx = 200, ry = 150;
+        int numWP = 24;
+        std::vector<std::pair<int,int>> wp;
+        for (int i = 0; i < numWP; ++i) {
+            float a = 2.0f * PI * i / numWP;
+            wp.push_back({std::clamp((int)(cx + rx*std::cos(a)), PAD, W-PAD-1),
+                          std::clamp((int)(cy + ry*std::sin(a)), PAD, H-PAD-1)});
+        }
+        for (int i = 0; i < numWP; ++i)
+            drawLine(wp[i].first, wp[i].second, wp[(i+1)%numWP].first, wp[(i+1)%numWP].second);
+        for (int y = 0; y < H; ++y)
+            for (int x = 0; x < W; ++x)
+                if (x==0||x==W-1||y==0||y==H-1) m_map.setGround(x, y, TileType::Wall);
+        for (int y = 1; y < H-1; ++y)
+            for (int x = 1; x < W-1; ++x)
+                if (m_map.getGround(x,y) == TileType::Grass) {
+                    bool nr = false;
+                    for (int dy=-1; dy<=1 && !nr; ++dy)
+                        for (int dx=-1; dx<=1 && !nr; ++dx)
+                            if (m_map.getGround(x+dx,y+dy) == TileType::Road) nr = true;
+                    if (nr) m_map.setGround(x, y, TileType::Wall);
+                }
+        for (int i = 0; i < numWP; i += numWP/4) {
+            auto& p = wp[i];
+            auto& pn = wp[(i+1)%numWP];
+            float dirX = (float)(pn.first-p.first), dirY = (float)(pn.second-p.second);
+            float dirLen = std::sqrt(dirX*dirX+dirY*dirY);
+            if (dirLen < 0.001f) continue;
+            float perpX = -dirY/dirLen, perpY = dirX/dirLen;
+            int hs = ROAD_HW + 2;
+            m_map.checkpoints().push_back({
+                p.first + (int)(perpX*hs), p.second + (int)(perpY*hs),
+                p.first - (int)(perpX*hs), p.second - (int)(perpY*hs)
+            });
+        }
+        float spawnAng = std::atan2((float)(wp[1].second-wp[0].second), (float)(wp[1].first-wp[0].first));
+        for (int i = 0; i < 4; ++i) {
+            Spawn sp;
+            sp.x = wp[i].first;
+            sp.y = wp[i].second;
+            sp.angle = spawnAng;
+            m_map.spawns().push_back(sp);
+        }
+        m_map.setLaps(3);
     }
 
     m_cars.clear();
