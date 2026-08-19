@@ -26,11 +26,14 @@ void Registry::registerServer(const std::string& ip, int port, const std::string
     m_servers.push_back(entry);
 }
 
-void Registry::heartbeat(const std::string& ip, int port, int players) {
+void Registry::heartbeat(const std::string& ip, int port, int players,
+                         const std::string& mapName, const std::string& mapData) {
     std::lock_guard<std::mutex> lock(m_mutex);
     for (auto& s : m_servers) {
         if (s.ip == ip && s.port == port) {
             s.players = players;
+            if (!mapName.empty()) s.mapName = mapName;
+            if (!mapData.empty()) s.mapData = mapData;
             s.lastHeartbeat = std::chrono::steady_clock::now();
             return;
         }

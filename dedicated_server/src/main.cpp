@@ -45,7 +45,8 @@ static bool registerWithMaster(const std::string& masterUrl, int port, const std
     return false;
 }
 
-static bool heartbeatMaster(const std::string& masterUrl, int port, int players) {
+static bool heartbeatMaster(const std::string& masterUrl, int port, int players,
+                            const std::string& mapName, const std::string& mapData) {
     httplib::Client cli(masterUrl.c_str());
     cli.set_connection_timeout(3, 0);
     cli.set_read_timeout(3, 0);
@@ -53,6 +54,8 @@ static bool heartbeatMaster(const std::string& masterUrl, int port, int players)
     nlohmann::json body;
     body["port"] = port;
     body["players"] = players;
+    body["mapName"] = mapName;
+    body["mapData"] = mapData;
 
     auto res = cli.Post("/heartbeat", body.dump(), "application/json");
     return res && res->status == 200;
@@ -119,7 +122,16 @@ int main(int argc, char* argv[]) {
 
         auto elapsedSinceHeartbeat = std::chrono::duration_cast<std::chrono::seconds>(now - lastHeartbeat).count();
         if (elapsedSinceHeartbeat >= 10 || server.takePlayerCountChanged()) {
-            heartbeatMaster(masterUrl, port, server.getPlayerCount());
+            heartbeatMaster(masterUrl, port, server.getPlayerCount(),
+                            server.getMapName(), server.getMapData());
+            lastHeartbeat = now;
+        }
+
+        if (server.checkMapChanged()) {
+            fprintf(stderr, "Map file changed on disk, reloading...\n");
+            server.reloadMap();
+            heartbeatMaster(masterUrl, port, server.getPlayerCount(),
+                            server.getMapName(), server.getMapData());
             lastHeartbeat = now;
         }
 

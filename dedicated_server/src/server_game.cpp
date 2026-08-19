@@ -6,6 +6,8 @@
 #include <cstring>
 #include <cmath>
 
+namespace fs = std::filesystem;
+
 namespace mm {
 
 using net::PacketHeader;
@@ -32,6 +34,12 @@ bool ServerGame::init(int port, int maxPlayers, const std::string& mapPath) {
     }
     m_mapName = m_map.name();
     m_mapData = readFile(mapPath);
+    m_mapPath = mapPath;
+    m_mapModTime = fs::last_write_time(mapPath);
+
+    fprintf(stderr, "Map loaded: %s (%dx%d, ts=%d, spawns=%d, checkpoints=%d)\n",
+            m_mapName.c_str(), m_map.width(), m_map.height(), m_map.tileSize(),
+            (int)m_map.spawns().size(), (int)m_map.checkpoints().size());
 
     raceInit(m_race, m_map, maxPlayers);
     m_race.state = RaceState::Waiting;
@@ -187,6 +195,7 @@ void ServerGame::update(float dt) {
             }
             fprintf(stderr, "Not enough players, waiting...\n");
         }
+        sendState();
         return;
     }
 
@@ -252,6 +261,58 @@ int ServerGame::getPlayerCount() const {
     for (int i = 0; i < m_maxPlayers; ++i)
         if (m_players[i].connected) count++;
     return count;
+}
+
+bool ServerGame::checkMapChanged() {
+    try {
+        auto modTime = fs::last_write_time(m_mapPath);
+        return modTime != m_mapModTime;
+    } catch (...) {
+        return false;
+    }
+}
+
+void ServerGame::reloadMap() {
+    MapData loaded;
+    if (!MapSerializer::loadFromFile(loaded, m_mapPath)) {
+        fprintf(stderr, "Failed to reload map: %s\n", m_mapPath.c_str());
+        return;
+    }
+    m_map = std::move(loaded);
+    m_mapName = m_map.name();
+    m_mapData = readFile(m_mapPath);
+    m_mapModTime = fs::last_write_time(m_mapPath);
+
+    raceInit(m_race, m_map, m_maxPlayers);
+    m_race.state = RaceState::Waiting;
+
+    for (int i = 0; i < m_maxPlayers; ++i) {
+        if (m_players[i].connected) {
+            float ts = m_map.tileSize();
+            if (!m_map.spawns().empty()) {
+                if (i < static_cast<int>(m_map.spawns().size())) {
+                    auto& s = m_map.spawns()[i];
+                    m_players[i].car.x = (s.x + 0.5f) * ts;
+                    m_players[i].car.y = (s.y + 0.5f) * ts;
+                    m_players[i].car.heading = s.angle;
+                } else {
+                    auto& s = m_map.spawns()[0];
+                    float cosA = std::cos(s.angle);
+                    float sinA = std::sin(s.angle);
+                    float depth = i * 20.0f;
+                    float side = ((i % 2) == 0 ? -1.0f : 1.0f) * 15.0f;
+                    m_players[i].car.x = (s.x + 0.5f) * ts - cosA * depth + (-sinA) * side;
+                    m_players[i].car.y = (s.y + 0.5f) * ts - sinA * depth + cosA * side;
+                    m_players[i].car.heading = s.angle;
+                }
+            }
+            m_players[i].car.vx = 0;
+            m_players[i].car.vy = 0;
+            m_players[i].car.speed = 0;
+        }
+    }
+
+    fprintf(stderr, "Map reloaded: %s\n", m_mapName.c_str());
 }
 
 void ServerGame::broadcastReliable(const void* data, size_t size) {

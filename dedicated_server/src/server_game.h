@@ -8,6 +8,7 @@
 #include <enet/enet.h>
 #include <string>
 #include <vector>
+#include <filesystem>
 
 namespace mm {
 
@@ -37,6 +38,8 @@ public:
     int getPlayerCount() const;
     int getMaxPlayers() const { return m_maxPlayers; }
     bool takePlayerCountChanged() { bool v = m_playerCountChanged; m_playerCountChanged = false; return v; }
+    bool checkMapChanged();
+    void reloadMap();
 
 private:
     void broadcastReliable(const void* data, size_t size);
@@ -52,6 +55,8 @@ private:
     CarConfig m_carCfg;
     std::vector<ServerPlayer> m_players;
     ENetHost* m_host = nullptr;
+    std::string m_mapPath;
+    std::filesystem::file_time_type m_mapModTime;
 };
 
 } // namespace mm

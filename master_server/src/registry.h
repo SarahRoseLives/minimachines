@@ -21,7 +21,8 @@ class Registry {
 public:
     void registerServer(const std::string& ip, int port, const std::string& mapName,
                         const std::string& mapData, int players, int maxPlayers);
-    void heartbeat(const std::string& ip, int port, int players);
+    void heartbeat(const std::string& ip, int port, int players,
+                   const std::string& mapName = "", const std::string& mapData = "");
     void cleanup(int timeoutSeconds = 60);
     std::vector<ServerEntry> getServers() const;
     std::string getMapData(const std::string& ip, int port) const;

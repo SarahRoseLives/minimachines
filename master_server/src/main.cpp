@@ -42,8 +42,10 @@ int main(int argc, char* argv[]) {
             std::string ip = j.value("ip", req.remote_addr);
             int sport = j.value("port", 27015);
             int players = j.value("players", 0);
+            std::string mapName = j.value("mapName", "");
+            std::string mapData = j.value("mapData", "");
 
-            registry.heartbeat(ip, sport, players);
+            registry.heartbeat(ip, sport, players, mapName, mapData);
             res.set_content("{\"ok\":true}", "application/json");
         } catch (...) {
             res.status = 400;
